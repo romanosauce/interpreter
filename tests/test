@@ -1,0 +1,12 @@
+program
+    abcd
+  : <=
+  ab<=cd
+  while
+      12345
+
+/*  
+   ab:cd
+    */ 
+
+abcd
