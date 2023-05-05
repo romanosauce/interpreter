@@ -23,7 +23,7 @@ enum  TypeOfLex {
     LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_LEQ, LEX_NEQ, LEX_GEQ, LEX_NUM,
     LEX_PERCENT,
 
-    LEX_ID,
+    LEX_IDENT,
 };
 
 class Lex {
@@ -138,13 +138,14 @@ Scanner::Scanner(string file_name) {
 void Scanner::DeleteComment() {
     string::size_type com_st = ptr_;
     string::size_type com_end = data_.find("*/", ptr_);
+    cout << com_end << '\n';
     if (com_end != data_.npos && com_st < com_end) {
-        string comment = data_.substr(com_st, com_end);
-        string::size_type st = com_st;
+        string comment = data_.substr(com_st, com_end - com_st);
+        string::size_type st = 0;
         while (comment.find("\n", st) != data_.npos) {
             line_count++;
             cout << "Line " << line_count << '\n';
-            st = comment.find("\n", st);
+            st = comment.find("\n", st) + 1;
         }
         ptr_ = com_end + 2;
         cur_char_ = data_[ptr_];
@@ -164,11 +165,15 @@ string Scanner::GetWord() {
 
 string Scanner::GetDelim() {
     size_t st_pos = ptr_;
-    while (stop_chars_.find(data_[ptr_]) != stop_chars_.end() &&
-           data_[ptr_] != ' ' && data_[ptr_] != '\n' && data_[ptr_] != '\t') {
-        ptr_++;
+    if (((cur_char_ == '<' || cur_char_ == '>' || cur_char_ == '=') &&
+        data_[ptr_+1] == '=') || cur_char_ == '!') {
+        ptr_ += 2;
+        cur_char_ = data_[ptr_];
+        return data_.substr(st_pos, 2);
     }
-    return data_.substr(st_pos, ptr_ - st_pos);
+    ptr_++;
+    cur_char_ = data_[ptr_];
+    return data_.substr(st_pos, 1);
 }
 
 map<string, TypeOfLex> Scanner::reserved_words_ = {
@@ -226,6 +231,7 @@ map<string, TypeOfLex> Scanner::delimeters_ = {
 
 Lex Scanner::GetLex() {
     SkipSpaces();
+    //cout << "CHAR: " << cur_char_ << '\n';
     if (isalpha(cur_char_)) {
         string buf = GetWord();
         if (reserved_words_.find(buf) != reserved_words_.end()) {
@@ -251,6 +257,7 @@ Lex Scanner::GetLex() {
         return Lex(LEX_NUM, value, "NUMBER");
     }
     if (cur_char_ == '/' && data_[ptr_ + 1] == '*') {
+        cout << "DeleteComment" << '\n';
         DeleteComment();
         return GetLex();
     }
@@ -278,7 +285,7 @@ ostream &operator<<(ostream &s, Lex lexeme) {
 
 
 int main() {
-    Scanner prog("tests/test");
+    Scanner prog("tests/test1");
     Lex cur_lex = prog.GetLex();
     while (cur_lex.get_type() != LEX_FIN) {
         cout << cur_lex;
