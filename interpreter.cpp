@@ -163,7 +163,6 @@ string Scanner::GetWord() {
     while (stop_chars_.find(data_[ptr_]) == stop_chars_.end()) {
         ptr_++;
     }
-    cout << "AAA " << st_pos << ' ' << ptr_ << '\n';
     return data_.substr(st_pos, ptr_ - st_pos);
 }
 
@@ -222,7 +221,7 @@ map<string, TypeOfLex> Scanner::reserved_words_ = {
 
 set<char> Scanner::stop_chars_ = {
     ' ', '\n', '\t', '*', '%', '+', '-', '<', '>', '=', '!', ',',
-    ';', ':', '(', ')', '/', '"'
+    ';', ':', '(', ')', '/', '"', '{', '}'
 };
 
 map<string, TypeOfLex> Scanner::delimeters_ = {
@@ -269,6 +268,7 @@ Lex Scanner::GetLex() {
     if (isdigit(cur_char_)) {
         int value = 0;
         value = cur_char_ - '0';
+        NextSymbol();
         while (isdigit(cur_char_)) {
             value = value * 10 + cur_char_ - '0';
             NextSymbol();
@@ -288,8 +288,6 @@ Lex Scanner::GetLex() {
     }
     if (stop_chars_.find(data_[ptr_]) != stop_chars_.end()) {
         string buf = GetDelim();
-        cout << "GetDelim: " << '\'' << buf <<'\'' << '\n';
-        cout << delimeters_[buf] << '\n';
         return Lex((TypeOfLex) delimeters_[buf], (int) delimeters_[buf], buf);
     }
     else {
@@ -329,23 +327,28 @@ class Parser {
             cur_lex_ = scan_.GetLex();
             c_type_ = cur_lex_.get_type();
             c_val_ = cur_lex_.get_value();
+            cout << cur_lex_;
         }
 };
 
 void Parser::StartAnalysis() {
     GetNextLex();
-    cout << "1\n";
     ReadProgram();
     for (const Ident &it : TID) {
+        cout << "-----------\n";
         cout << it.get_name() << ' '
              << it.get_declare() << ' '
              << it.get_assign() << ' ';
         visit([](auto&& arg){ std::cout << arg; }, it.get_value());
+        cout << '\n';
     }
-    if (c_type_ != LEX_FIN) {}
+    if (c_type_ != LEX_FIN) {
+        //error handling
+    }
 }
 
 void Parser::ReadProgram() {
+    cout << "ReadProg\n";
     if (c_type_ == LEX_PROGRAM) {
         GetNextLex();
     } else {
@@ -364,6 +367,7 @@ void Parser::ReadProgram() {
 }
 
 void Parser::ReadDeclarations() {
+    cout << "ReadDecl\n";
     while (c_type_ == LEX_INT || c_type_ == LEX_STRING ||
            c_type_ == LEX_BOOL) {
         Declaration();
@@ -375,9 +379,10 @@ void Parser::ReadDeclarations() {
 }
 
 void Parser::Declaration() {
+    cout << "Decl\n";
     TypeOfLex decl_type = c_type_;
-    GetNextLex();
     do {
+        GetNextLex();
         if (c_type_ != LEX_IDENT) {
             //error handling
         } else {
@@ -389,7 +394,8 @@ void Parser::Declaration() {
                 TID[index].set_type(decl_type);
             }
             GetNextLex();
-            if (c_type_ == LEX_EQ) {
+            if (c_type_ == LEX_ASSIGN) {
+                cout << "1\n";
                 GetNextLex();
                 if (c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
                     if (decl_type == LEX_INT) {
@@ -405,13 +411,13 @@ void Parser::Declaration() {
                     }
                 } else if (c_type_ == LEX_STR) {
                     if (decl_type == LEX_STRING) {
-                        TID[index].set_value(cur_lex_.get_value());
+                        TID[index].set_value(cur_lex_.get_holder());
                         TID[index].set_assign();
                     } else {
                         //error handling
                     }
                 } else if (c_type_ == LEX_NUM) {
-                    if (c_type_ != LEX_NUM) {
+                    if (decl_type != LEX_INT) {
                         //error handling
                     }
                     TID[index].set_value(cur_lex_.get_value());
@@ -432,12 +438,14 @@ void Parser::ReadOperators() {
 }
 
 int main() {
-    Scanner prog("tests/test1");
+    Scanner prog("tests/test2");
     Lex cur_lex = prog.GetLex();
     while (cur_lex.get_type() != LEX_FIN) {
         cout << cur_lex;
         cur_lex = prog.GetLex();
     }
+    TID.clear();
+    line_count = 0;
     Parser test_prog("tests/test2");
     test_prog.StartAnalysis();
     cout << "end\n";
