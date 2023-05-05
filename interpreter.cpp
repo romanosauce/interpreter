@@ -1,10 +1,12 @@
 #include <fstream>
 #include <sstream>
 #include <iostream>
+#include <stack>
 #include <vector>
 #include <map>
 #include <set>
 #include <algorithm>
+#include <variant>
 
 using namespace std;
 
@@ -21,14 +23,15 @@ enum  TypeOfLex {
     LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_ASSIGN, LEX_LPAREN, LEX_RPAREN,
     LEX_LCURL_BRACKET, LEX_RCURL_BRACKET, LEX_EQ, LEX_LSS, LEX_GTR, LEX_PLUS, 
     LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_LEQ, LEX_NEQ, LEX_GEQ, LEX_NUM,
-    LEX_PERCENT,
+    LEX_STR, LEX_PERCENT, LEX_QUOTE,
 
     LEX_IDENT,
 };
 
 class Lex {
     public:
-        Lex(TypeOfLex t = LEX_NULL, int v = 0, string holder = "")
+        Lex(TypeOfLex t = LEX_NULL, int v = 0, 
+            const string &holder = string(""))
             : t_lex_(t), v_lex_(v), holder_(holder) {}
         TypeOfLex get_type() const {
             return t_lex_;
@@ -49,9 +52,9 @@ class Lex {
 class Ident {
     public:
         Ident() : declare_(false), assign_(false) {}
-        Ident(const string name) : name_(name), declare_(false),
+        Ident(const string &name) : name_(name), declare_(false),
                                    assign_(false) {}
-        bool operator==(const string& s) const {
+        bool operator==(const string &s) const {
             return name_ == s;
         }
         string get_name() const {
@@ -75,10 +78,10 @@ class Ident {
         void set_assign() {
             assign_ = true;
         }
-        int get_value() const {
+        variant<int, bool, string> get_value() const {
             return value_;
         }
-        void set_value(int v) {
+        void set_value(const variant<int, bool, string> &v) {
             value_ = v;
         }
     private:
@@ -86,7 +89,7 @@ class Ident {
         bool declare_;
         bool assign_;
         TypeOfLex type_;
-        int value_;
+        variant<int, bool, string> value_;
 };
 
 vector<Ident> TID;
@@ -97,7 +100,7 @@ class Scanner {
         static set<char> stop_chars_;
         static map<string, TypeOfLex> delimeters_;
 
-        Scanner(string file);
+        Scanner(const string &file);
         Lex GetLex();
         void NextSymbol() {
             ptr_++;
@@ -124,9 +127,10 @@ class Scanner {
         void DeleteComment();
         string GetWord();
         string GetDelim();
+        string GetStr();
 };
 
-Scanner::Scanner(string file_name) {
+Scanner::Scanner(const string &file_name) {
     ifstream file(file_name, std::ios::binary);
     stringstream buf;
     buf << file.rdbuf();
@@ -150,7 +154,7 @@ void Scanner::DeleteComment() {
         ptr_ = com_end + 2;
         cur_char_ = data_[ptr_];
     } else {
-        //error handler
+        //error handling
     }
 }
 
@@ -175,6 +179,20 @@ string Scanner::GetDelim() {
     cur_char_ = data_[ptr_];
     return data_.substr(st_pos, 1);
 }
+
+string Scanner::GetStr() {
+    string buf;
+    while (data_[++ptr_] != '"') {
+        buf.push_back(data_[ptr_]);
+        if (ptr_ == '\n' || ptr_ == data_.size()) {
+            //error handling
+        }
+    }
+    ptr_++;
+    cur_char_ = data_[ptr_];
+    return buf;
+}
+    
 
 map<string, TypeOfLex> Scanner::reserved_words_ = {
     {"and", LEX_AND},
@@ -204,7 +222,7 @@ map<string, TypeOfLex> Scanner::reserved_words_ = {
 
 set<char> Scanner::stop_chars_ = {
     ' ', '\n', '\t', '*', '%', '+', '-', '<', '>', '=', '!', ',',
-    ';', ':', '(', ')', '/'
+    ';', ':', '(', ')', '/', '"'
 };
 
 map<string, TypeOfLex> Scanner::delimeters_ = {
@@ -226,7 +244,8 @@ map<string, TypeOfLex> Scanner::delimeters_ = {
     {"<=", LEX_LEQ},
     {"!=", LEX_NEQ},
     {">=", LEX_GEQ},
-    {"%", LEX_PERCENT}
+    {"%", LEX_PERCENT},
+    {"\"", LEX_QUOTE}
 };
 
 Lex Scanner::GetLex() {
@@ -261,6 +280,9 @@ Lex Scanner::GetLex() {
         DeleteComment();
         return GetLex();
     }
+    if (cur_char_ == '"') {
+        return Lex(LEX_STR, (int) LEX_STR, GetStr());
+    }
     if (ptr_ == data_.size()) {
         return Lex(LEX_FIN, 0, "FINAL");
     }
@@ -283,6 +305,131 @@ ostream &operator<<(ostream &s, Lex lexeme) {
     return s;
 }
 
+class Parser {
+    public:
+        vector<Lex> poliz;
+        Parser(const string &file) : scan_(file) {}
+        void StartAnalysis();
+    private:
+        Lex cur_lex_;
+        TypeOfLex c_type_;
+        int c_val_;
+        Scanner scan_;
+        stack<int> st_int_;
+        stack<TypeOfLex> st_lex_;
+        void ReadProgram();
+        void ReadDeclarations();
+        void ReadOperators();
+        void Declaration();
+        void Var();
+        void Operator();
+        void Expression();
+
+        void GetNextLex() {
+            cur_lex_ = scan_.GetLex();
+            c_type_ = cur_lex_.get_type();
+            c_val_ = cur_lex_.get_value();
+        }
+};
+
+void Parser::StartAnalysis() {
+    GetNextLex();
+    cout << "1\n";
+    ReadProgram();
+    for (const Ident &it : TID) {
+        cout << it.get_name() << ' '
+             << it.get_declare() << ' '
+             << it.get_assign() << ' ';
+        visit([](auto&& arg){ std::cout << arg; }, it.get_value());
+    }
+    if (c_type_ != LEX_FIN) {}
+}
+
+void Parser::ReadProgram() {
+    if (c_type_ == LEX_PROGRAM) {
+        GetNextLex();
+    } else {
+        //error handling
+    }
+    if (c_type_ == LEX_LCURL_BRACKET) {
+        GetNextLex();
+    } else {
+        //error handling
+    }
+    ReadDeclarations();
+    ReadOperators();
+    if (c_type_ != LEX_RCURL_BRACKET) {
+        //error handling
+    }
+}
+
+void Parser::ReadDeclarations() {
+    while (c_type_ == LEX_INT || c_type_ == LEX_STRING ||
+           c_type_ == LEX_BOOL) {
+        Declaration();
+        if (c_type_ != LEX_SEMICOLON) {
+            //error handling
+        }
+        GetNextLex();
+    }
+}
+
+void Parser::Declaration() {
+    TypeOfLex decl_type = c_type_;
+    GetNextLex();
+    do {
+        if (c_type_ != LEX_IDENT) {
+            //error handling
+        } else {
+            int index = cur_lex_.get_value();
+            if (TID[index].get_declare()) {
+                //error handling
+            } else {
+                TID[index].set_declare();
+                TID[index].set_type(decl_type);
+            }
+            GetNextLex();
+            if (c_type_ == LEX_EQ) {
+                GetNextLex();
+                if (c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
+                    if (decl_type == LEX_INT) {
+                        GetNextLex();
+                        if (c_type_ != LEX_NUM) {
+                            //error handling
+                        }
+                        TID[index].set_value((c_type_ == LEX_MINUS ? -1 : 1) *
+                                              cur_lex_.get_value());
+                        TID[index].set_assign();
+                    } else {
+                        //error handling
+                    }
+                } else if (c_type_ == LEX_STR) {
+                    if (decl_type == LEX_STRING) {
+                        TID[index].set_value(cur_lex_.get_value());
+                        TID[index].set_assign();
+                    } else {
+                        //error handling
+                    }
+                } else if (c_type_ == LEX_NUM) {
+                    if (c_type_ != LEX_NUM) {
+                        //error handling
+                    }
+                    TID[index].set_value(cur_lex_.get_value());
+                    TID[index].set_assign();
+                } else if (c_type_ == LEX_TRUE || c_type_ == LEX_FALSE) {
+                    TID[index].set_value((c_type_ == LEX_TRUE ? true : false));
+                    TID[index].set_assign();
+                } else {
+                    //error handling
+                }
+                GetNextLex();
+            }
+        }
+    } while (c_type_ == LEX_COMMA);
+}
+
+void Parser::ReadOperators() {
+}
 
 int main() {
     Scanner prog("tests/test1");
@@ -291,4 +438,7 @@ int main() {
         cout << cur_lex;
         cur_lex = prog.GetLex();
     }
+    Parser test_prog("tests/test2");
+    test_prog.StartAnalysis();
+    cout << "end\n";
 }

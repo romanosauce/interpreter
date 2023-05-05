@@ -1,0 +1,4 @@
+program {
+    int a = 25, b = 55;
+    string s = "abcd";
+}
