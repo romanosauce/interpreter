@@ -12,13 +12,18 @@ int line_count = 0;
 
 enum  TypeOfLex {
     LEX_NULL,
-    LEX_IDENT,
-    LEX_NUM,
-    LEX_PROGRAM,
-    LEX_WHILE,
-    LEX_COLON,
-    LEX_GEQ,
-    LEX_FIN
+
+    LEX_AND, LEX_BOOL, LEX_DO, LEX_ELSE, LEX_END, LEX_IF, LEX_FALSE,
+    LEX_INT, LEX_NOT, LEX_OR, LEX_PROGRAM, LEX_READ, LEX_THEN, LEX_TRUE,
+    LEX_WHILE, LEX_WRITE, LEX_STRING, LEX_FIN, LEX_CONTINUE,
+    LEX_BREAK, LEX_GOTO,
+
+    LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_ASSIGN, LEX_LPAREN, LEX_RPAREN,
+    LEX_LCURL_BRACKET, LEX_RCURL_BRACKET, LEX_EQ, LEX_LSS, LEX_GTR, LEX_PLUS, 
+    LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_LEQ, LEX_NEQ, LEX_GEQ, LEX_NUM,
+    LEX_PERCENT,
+
+    LEX_ID,
 };
 
 class Lex {
@@ -167,8 +172,26 @@ string Scanner::GetDelim() {
 }
 
 map<string, TypeOfLex> Scanner::reserved_words_ = {
+    {"and", LEX_AND},
+    {"boolean", LEX_BOOL},
+    {"do", LEX_DO},
+    {"else", LEX_ELSE},
+    {"end", LEX_END},
+    {"if", LEX_IF},
+    {"false", LEX_FALSE},
+    {"int", LEX_INT},
+    {"not", LEX_NOT},
+    {"or", LEX_OR},
     {"program", LEX_PROGRAM},
-    {"while", LEX_WHILE}
+    {"read", LEX_READ},
+    {"then", LEX_THEN},
+    {"true", LEX_TRUE},
+    {"while", LEX_WHILE},
+    {"write", LEX_WRITE},
+    {"string", LEX_STRING},
+    {"continue", LEX_CONTINUE},
+    {"break", LEX_BREAK},
+    {"goto", LEX_GOTO}
     //"program", "int", "real", "string", "boolean", "if", "else",
     //"do", "while", "read", "write", "for", "break", "continue", "true",
     //"false", "not", "and", "or", "goto"
@@ -180,8 +203,25 @@ set<char> Scanner::stop_chars_ = {
 };
 
 map<string, TypeOfLex> Scanner::delimeters_ = {
+    {";", LEX_SEMICOLON},
+    {",", LEX_COMMA},
     {":", LEX_COLON},
+    {"=", LEX_ASSIGN},
+    {"(", LEX_LPAREN},
+    {")", LEX_RPAREN},
+    {"{", LEX_LCURL_BRACKET},
+    {"}", LEX_RCURL_BRACKET},
+    {"==", LEX_EQ},
+    {"<", LEX_LSS},
+    {">", LEX_GTR},
+    {"+", LEX_PLUS}, 
+    {"-", LEX_MINUS},
+    {"*", LEX_TIMES},
+    {"/", LEX_SLASH},
+    {"<=", LEX_LEQ},
+    {"!=", LEX_NEQ},
     {">=", LEX_GEQ},
+    {"%", LEX_PERCENT}
 };
 
 Lex Scanner::GetLex() {
