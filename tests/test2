@@ -1,4 +1,7 @@
 program {
     int a = 25, b = 65;
     string s = "abcd";
+    boolean t1, t2 = true, t3, t4 = false;
+    int c = 6665;
 }
+<

@@ -10,7 +10,28 @@
 
 using namespace std;
 
-int line_count = 0;
+size_t line_count = 0;
+
+enum ErrorType {
+    FILE_BAD = -1,
+    COMM_NO_CLOSE,
+    WRONG_STR_CONST,
+    UNKNOWN_SYM,
+    SYNT_LEX_AFTER_END,
+    SYNT_NOPROG,
+    SYNT_NO_OPCURL_BRAC,
+    SYNT_NO_CLCURL_BRAC,
+    SYNT_NO_SEMICOLON,
+    WRONG_IDENT_NAME,
+    SEM_PREV_DECL,
+    SEM_WRONG_TYPE
+};
+
+vector<pair<ErrorType, size_t>> err_stk;
+
+int ErrorHandler() {
+    return 0;
+}
 
 enum  TypeOfLex {
     LEX_NULL,
@@ -109,7 +130,7 @@ class Scanner {
     private:
         string data_;
         char cur_char_;
-        int ptr_;
+        size_t ptr_;
         void SkipSpaces() {
             if (ptr_ == data_.size()) {
                 return;
@@ -131,19 +152,24 @@ class Scanner {
 };
 
 Scanner::Scanner(const string &file_name) {
-    ifstream file(file_name, std::ios::binary);
+    ifstream file(file_name, ios::binary);
+    if (file.fail()) {
+        err_stk.push_back({FILE_BAD, 0});
+        ErrorHandler();
+    }
     stringstream buf;
     buf << file.rdbuf();
     data_ = buf.str();
     cout << data_ << '\n';
     ptr_ = 0;
+    file.close();
 }
 
 void Scanner::DeleteComment() {
     string::size_type com_st = ptr_;
     string::size_type com_end = data_.find("*/", ptr_);
     cout << com_end << '\n';
-    if (com_end != data_.npos && com_st < com_end) {
+    if (com_end != data_.npos) {
         string comment = data_.substr(com_st, com_end - com_st);
         string::size_type st = 0;
         while (comment.find("\n", st) != data_.npos) {
@@ -154,7 +180,8 @@ void Scanner::DeleteComment() {
         ptr_ = com_end + 2;
         cur_char_ = data_[ptr_];
     } else {
-        //error handling
+        err_stk.push_back({COMM_NO_CLOSE, line_count});
+        ErrorHandler();
     }
 }
 
@@ -184,7 +211,8 @@ string Scanner::GetStr() {
     while (data_[++ptr_] != '"') {
         buf.push_back(data_[ptr_]);
         if (ptr_ == '\n' || ptr_ == data_.size()) {
-            //error handling
+            err_stk.push_back({WRONG_STR_CONST, line_count});
+            ErrorHandler();
         }
     }
     ptr_++;
@@ -264,8 +292,7 @@ Lex Scanner::GetLex() {
                 return Lex(LEX_IDENT, TID.size() - 1, buf);
             }
         }
-    }
-    if (isdigit(cur_char_)) {
+    } else if (isdigit(cur_char_)) {
         int value = 0;
         value = cur_char_ - '0';
         NextSymbol();
@@ -274,25 +301,20 @@ Lex Scanner::GetLex() {
             NextSymbol();
         }
         return Lex(LEX_NUM, value, "NUMBER");
-    }
-    if (cur_char_ == '/' && data_[ptr_ + 1] == '*') {
+    } else if (cur_char_ == '/' && data_[ptr_ + 1] == '*') {
         cout << "DeleteComment" << '\n';
         DeleteComment();
         return GetLex();
-    }
-    if (cur_char_ == '"') {
+    } else if (cur_char_ == '"') {
         return Lex(LEX_STR, (int) LEX_STR, GetStr());
-    }
-    if (ptr_ == data_.size()) {
+    } else if (ptr_ == data_.size()) {
         return Lex(LEX_FIN, 0, "FINAL");
-    }
-    if (stop_chars_.find(data_[ptr_]) != stop_chars_.end()) {
+    } else if (stop_chars_.find(data_[ptr_]) != stop_chars_.end()) {
         string buf = GetDelim();
         return Lex((TypeOfLex) delimeters_[buf], (int) delimeters_[buf], buf);
-    }
-    else {
-        //error handling
-        return Lex(LEX_NULL, 0, "NULL");
+    } else {
+        err_stk.push_back({UNKNOWN_SYM, line_count});
+        ErrorHandler();
     }
 }
 
@@ -343,7 +365,8 @@ void Parser::StartAnalysis() {
         cout << '\n';
     }
     if (c_type_ != LEX_FIN) {
-        //error handling
+        err_stk.push_back({SYNT_LEX_AFTER_END, line_count});
+        ErrorHandler();
     }
 }
 
@@ -352,17 +375,20 @@ void Parser::ReadProgram() {
     if (c_type_ == LEX_PROGRAM) {
         GetNextLex();
     } else {
-        //error handling
+        err_stk.push_back({SYNT_NOPROG, line_count});
+        ErrorHandler();
     }
     if (c_type_ == LEX_LCURL_BRACKET) {
         GetNextLex();
     } else {
-        //error handling
+        err_stk.push_back({SYNT_NO_OPCURL_BRAC, line_count});
+        ErrorHandler();
     }
     ReadDeclarations();
     ReadOperators();
     if (c_type_ != LEX_RCURL_BRACKET) {
-        //error handling
+        err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
+        ErrorHandler();
     }
 }
 
@@ -372,7 +398,8 @@ void Parser::ReadDeclarations() {
            c_type_ == LEX_BOOL) {
         Declaration();
         if (c_type_ != LEX_SEMICOLON) {
-            //error handling
+            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+            return;
         }
         GetNextLex();
     }
@@ -384,41 +411,46 @@ void Parser::Declaration() {
     do {
         GetNextLex();
         if (c_type_ != LEX_IDENT) {
-            //error handling
+            err_stk.push_back({WRONG_IDENT_NAME, line_count});
+            ErrorHandler();
         } else {
             int index = cur_lex_.get_value();
             if (TID[index].get_declare()) {
-                //error handling
+                err_stk.push_back({SEM_PREV_DECL, line_count});
+                ErrorHandler();
             } else {
                 TID[index].set_declare();
                 TID[index].set_type(decl_type);
             }
             GetNextLex();
             if (c_type_ == LEX_ASSIGN) {
-                cout << "1\n";
                 GetNextLex();
                 if (c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
                     if (decl_type == LEX_INT) {
                         GetNextLex();
                         if (c_type_ != LEX_NUM) {
-                            //error handling
+                            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                            ErrorHandler();
                         }
                         TID[index].set_value((c_type_ == LEX_MINUS ? -1 : 1) *
                                               cur_lex_.get_value());
                         TID[index].set_assign();
                     } else {
-                        //error handling
+                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                        ErrorHandler();
                     }
                 } else if (c_type_ == LEX_STR) {
                     if (decl_type == LEX_STRING) {
                         TID[index].set_value(cur_lex_.get_holder());
                         TID[index].set_assign();
                     } else {
-                        //error handling
+                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                        ErrorHandler();
                     }
                 } else if (c_type_ == LEX_NUM) {
                     if (decl_type != LEX_INT) {
-                        //error handling
+                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                        ErrorHandler();
                     }
                     TID[index].set_value(cur_lex_.get_value());
                     TID[index].set_assign();
@@ -426,7 +458,8 @@ void Parser::Declaration() {
                     TID[index].set_value((c_type_ == LEX_TRUE ? true : false));
                     TID[index].set_assign();
                 } else {
-                    //error handling
+                    err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                    ErrorHandler();
                 }
                 GetNextLex();
             }
