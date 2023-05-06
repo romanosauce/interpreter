@@ -1,4 +1,5 @@
 #include <fstream>
+#include <new>
 #include <sstream>
 #include <iostream>
 #include <stack>
@@ -22,6 +23,10 @@ enum ErrorType {
     SYNT_NO_OPCURL_BRAC,
     SYNT_NO_CLCURL_BRAC,
     SYNT_NO_SEMICOLON,
+    SYNT_NO_OPPAREN,
+    SYNT_NO_CLPAREN,
+    SYNT_IF_ERR,
+    SYNT_FOR_ERR,
     WRONG_IDENT_NAME,
     SEM_PREV_DECL,
     SEM_WRONG_TYPE
@@ -39,7 +44,7 @@ enum  TypeOfLex {
     LEX_AND, LEX_BOOL, LEX_DO, LEX_ELSE, LEX_END, LEX_IF, LEX_FALSE,
     LEX_INT, LEX_NOT, LEX_OR, LEX_PROGRAM, LEX_READ, LEX_THEN, LEX_TRUE,
     LEX_WHILE, LEX_WRITE, LEX_STRING, LEX_FIN, LEX_CONTINUE,
-    LEX_BREAK, LEX_GOTO,
+    LEX_BREAK, LEX_GOTO, LEX_FOR,
 
     LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_ASSIGN, LEX_LPAREN, LEX_RPAREN,
     LEX_LCURL_BRACKET, LEX_RCURL_BRACKET, LEX_EQ, LEX_LSS, LEX_GTR, LEX_PLUS, 
@@ -241,7 +246,8 @@ map<string, TypeOfLex> Scanner::reserved_words_ = {
     {"string", LEX_STRING},
     {"continue", LEX_CONTINUE},
     {"break", LEX_BREAK},
-    {"goto", LEX_GOTO}
+    {"goto", LEX_GOTO},
+    {"for", LEX_FOR}
     //"program", "int", "real", "string", "boolean", "if", "else",
     //"do", "while", "read", "write", "for", "break", "continue", "true",
     //"false", "not", "and", "or", "goto"
@@ -344,6 +350,15 @@ class Parser {
         void Var();
         void Operator();
         void Expression();
+        void ReadIf();
+        void ReadFor();
+        void ReadWhile();
+        void Read();
+        void Write();
+        void ReadComplexOp();
+        void Break();
+        void Goto();
+        void MarkedOp();
 
         void GetNextLex() {
             cur_lex_ = scan_.GetLex();
@@ -468,6 +483,110 @@ void Parser::Declaration() {
 }
 
 void Parser::ReadOperators() {
+    while (c_type_ == LEX_IF || c_type_ == LEX_WHILE ||
+           c_type_ == LEX_READ || c_type_ == LEX_WRITE ||
+           c_type_ == LEX_LCURL_BRACKET || c_type_ == LEX_FOR ||
+           c_type_ == LEX_BREAK || c_type_ == LEX_GOTO ||
+           c_type_ == LEX_IDENT) {
+        Operator();
+    }
+}
+
+void Parser::Operator() {
+    if (c_type_ == LEX_IF) {
+        GetNextLex();
+        ReadIf();
+    } else if (c_type_ == LEX_FOR) {
+        GetNextLex();
+        ReadFor();
+    } else if (c_type_ == LEX_WHILE) {
+        GetNextLex();
+        ReadWhile();
+    } else if (c_type_ == LEX_READ) {
+        GetNextLex();
+        Read();
+    } else if (c_type_ == LEX_WRITE) {
+        GetNextLex();
+        Write();
+    } else if (c_type_ == LEX_LCURL_BRACKET) {
+        GetNextLex();
+        ReadComplexOp();
+    } else if (c_type_ == LEX_BREAK) {
+        Break();
+    } else if (c_type_ == LEX_GOTO) {
+        GetNextLex();
+        Goto();
+    } else if (c_type_ == LEX_IDENT) {
+        GetNextLex();
+        if (c_type_ == LEX_COLON) {
+            GetNextLex();
+            MarkedOp();
+        } else {
+            Expression();
+        }
+    }
+}
+
+void Parser::ReadIf() {
+    if (c_type_ != LEX_LPAREN) {
+        err_stk.push_back({SYNT_NO_OPPAREN, line_count});
+        ErrorHandler();
+    } else {
+        GetNextLex();
+        Expression();
+        GetNextLex();
+        if (c_type_ != LEX_RPAREN) {
+            err_stk.push_back({SYNT_NO_CLPAREN, line_count});
+            ErrorHandler();
+        } else {
+            GetNextLex();
+            Operator();
+            GetNextLex();
+            if (c_type_ != LEX_ELSE) {
+                err_stk.push_back({SYNT_IF_ERR, line_count});
+                ErrorHandler();
+            }
+            GetNextLex();
+            Operator();
+        }
+    }
+}
+
+void Parser::ReadFor() {
+    if (c_type_ != LEX_LPAREN) {
+        err_stk.push_back({SYNT_NO_OPPAREN, line_count});
+        ErrorHandler();
+    } else {
+        GetNextLex();
+        if (c_type_ != LEX_SEMICOLON) {
+            Expression();
+            GetNextLex();
+            if (c_type_ != LEX_SEMICOLON) {
+                err_stk.push_back({SYNT_FOR_ERR, line_count});
+                ErrorHandler();
+            }
+        }
+        GetNextLex();
+        if (c_type_ != LEX_SEMICOLON) {
+            Expression();
+            GetNextLex();
+            if (c_type_ != LEX_SEMICOLON) {
+                err_stk.push_back({SYNT_FOR_ERR, line_count});
+                ErrorHandler();
+            }
+        }
+        GetNextLex();
+        if (c_type_ != LEX_COLON) {
+            Expression();
+            GetNextLex();
+            if (c_type_ != LEX_COLON) {
+                err_stk.push_back({SYNT_FOR_ERR, line_count});
+                ErrorHandler();
+            }
+        }
+        GetNextLex();
+        Operator();
+    }
 }
 
 int main() {
