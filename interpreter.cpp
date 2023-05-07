@@ -347,7 +347,6 @@ class Parser {
         void ReadDeclarations();
         void ReadOperators();
         void Declaration();
-        void Var();
         void Operator();
         void Expression();
         void ReadIf();
@@ -586,6 +585,89 @@ void Parser::ReadFor() {
         }
         GetNextLex();
         Operator();
+    }
+}
+
+void Parser::ReadWhile() {
+    if (c_type_ != LEX_LPAREN) {
+        err_stk.push_back({SYNT_NO_OPPAREN, line_count});
+        ErrorHandler();
+    } else {
+        GetNextLex();
+        Expression();
+        GetNextLex();
+        if (c_type_ != LEX_RPAREN) {
+            err_stk.push_back({SYNT_NO_CLPAREN, line_count});
+            ErrorHandler();
+        }
+        GetNextLex();
+        Operator();
+    }
+}
+
+void Parser::Goto() {
+    if (c_type_ != LEX_IDENT) {
+        err_stk.push_back({WRONG_IDENT_NAME, line_count});
+        ErrorHandler();
+    } else {
+        GetNextLex();
+        if (c_type_ != LEX_SEMICOLON) {
+            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+            ErrorHandler();
+        }
+    }
+}
+
+void Parser::Break() {
+    GetNextLex();
+    if (c_type_ != LEX_SEMICOLON) {
+        err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+        ErrorHandler();
+    }
+}
+
+void Parser::Read() {
+    if (c_type_ != LEX_LPAREN) {
+        err_stk.push_back({SYNT_NO_OPPAREN, line_count});
+        ErrorHandler();
+    } else {
+        GetNextLex();
+        if (c_type_ != LEX_IDENT) {
+            err_stk.push_back({WRONG_IDENT_NAME, line_count});
+            ErrorHandler();
+        }
+        GetNextLex();
+        if (c_type_ != LEX_RPAREN) {
+            err_stk.push_back({SYNT_NO_CLPAREN, line_count});
+            ErrorHandler();
+        }
+        GetNextLex();
+        if (c_type_ != LEX_SEMICOLON) {
+            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+            ErrorHandler();
+        }
+    }
+}
+
+void Parser::Write() {
+    if (c_type_ != LEX_SEMICOLON) {
+        err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+        ErrorHandler();
+    } else {
+        do {
+            GetNextLex();
+            Expression();
+            GetNextLex();
+        } while (c_type_ == LEX_COMMA);
+        if (c_type_ != LEX_RPAREN) {
+            err_stk.push_back({SYNT_NO_CLPAREN, line_count});
+            ErrorHandler();
+        }
+        GetNextLex();
+        if (c_type_ != LEX_SEMICOLON) {
+            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+            ErrorHandler();
+        }
     }
 }
 
