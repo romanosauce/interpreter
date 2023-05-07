@@ -3,5 +3,8 @@ program {
     string s = "abcd";
     boolean t1, t2 = true, t3, t4 = false;
     int c = 6665;
+    {
+        2345;
+        2 + 3 * (a / 3 + 5) or 1;
+    }
 }
-<

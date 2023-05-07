@@ -34,6 +34,7 @@ enum ErrorType {
 
 vector<pair<ErrorType, size_t>> err_stk;
 
+
 int ErrorHandler() {
     for (auto it : err_stk) {
         ErrorType er = it.first;
@@ -101,6 +102,8 @@ int ErrorHandler() {
             default:
                 break;
         }
+    }
+    exit(0);
 }
 
 enum  TypeOfLex {
@@ -386,6 +389,7 @@ Lex Scanner::GetLex() {
     } else {
         err_stk.push_back({UNKNOWN_SYM, line_count});
         ErrorHandler();
+        return Lex(LEX_NULL);
     }
 }
 
@@ -421,7 +425,6 @@ class Parser {
         void ReadComplexOp();
         void Break();
         void Goto();
-        void MarkedOp();
         void Expression();
         void E1();
         void E2();
@@ -554,11 +557,16 @@ void Parser::Declaration() {
 }
 
 void Parser::ReadOperators() {
+    cout << "ReadOperators\n";
     while (c_type_ == LEX_IF || c_type_ == LEX_WHILE ||
            c_type_ == LEX_READ || c_type_ == LEX_WRITE ||
            c_type_ == LEX_LCURL_BRACKET || c_type_ == LEX_FOR ||
            c_type_ == LEX_BREAK || c_type_ == LEX_GOTO ||
-           c_type_ == LEX_IDENT) {
+           c_type_ == LEX_IDENT || c_type_ == LEX_NUM ||
+           c_type_ == LEX_TRUE || c_type_ == LEX_FALSE ||
+           c_type_ == LEX_STR || c_type_ == LEX_NOT ||
+           c_type_ == LEX_MINUS || c_type_ == LEX_PLUS ||
+           c_type_ == LEX_RPAREN) {
         Operator();
     }
 }
@@ -591,9 +599,20 @@ void Parser::Operator() {
         GetNextLex();
         if (c_type_ == LEX_COLON) {
             GetNextLex();
-            MarkedOp();
+            Operator();
         } else {
             Expression();
+        }
+    } else if (c_type_ == LEX_NUM || c_type_ == LEX_RPAREN ||
+               c_type_ == LEX_TRUE || c_type_ == LEX_FALSE ||
+               c_type_ == LEX_STR || c_type_ == LEX_NOT ||
+               c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
+        Expression();
+        if (c_type_ != LEX_SEMICOLON) {
+            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+            ErrorHandler();
+        } else {
+            GetNextLex();
         }
     }
 }
@@ -737,6 +756,7 @@ void Parser::Write() {
 }
 
 void Parser::ReadComplexOp() {
+    cout << "ReadComplexOp\n";
     ReadOperators();
     if (c_type_ != LEX_RCURL_BRACKET) {
         err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
@@ -760,7 +780,7 @@ void Parser::E1() {
 }
 
 void Parser::E2() {
-    E2();
+    E3();
     while (c_type_ == LEX_AND) {
         GetNextLex();
         E3();
@@ -795,6 +815,7 @@ void Parser::T() {
     F();
     while (c_type_ == LEX_TIMES || c_type_ == LEX_SLASH) {
         GetNextLex();
+        F();
     }
 }
 
@@ -825,6 +846,7 @@ void Parser::F() {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
         }
+        GetNextLex();
     } else {
         err_stk.push_back({WRONG_EXPR, line_count});
     }
