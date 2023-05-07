@@ -1,6 +1,4 @@
 #include <fstream>
-#include <math.h>
-#include <new>
 #include <sstream>
 #include <iostream>
 #include <stack>
@@ -37,7 +35,72 @@ enum ErrorType {
 vector<pair<ErrorType, size_t>> err_stk;
 
 int ErrorHandler() {
-    return 0;
+    for (auto it : err_stk) {
+        ErrorType er = it.first;
+        switch(er) {
+            case FILE_BAD:
+                cout << "Can't open the file\n";
+                break;
+            case COMM_NO_CLOSE:
+                cout << "Syntax error: no close symbols for comment\n";
+                break;
+            case WRONG_STR_CONST:
+                cout << "Missing \" on line " << it.second << '\n';
+                break;
+            case UNKNOWN_SYM:
+                cout << "Unknown symbol on line " << it.second << '\n';
+                break;
+            case SYNT_LEX_AFTER_END:
+                cout << "Syntax error: find lexemes after end" << '\n';
+                break;
+            case SYNT_NOPROG:
+                cout << "Syntax error: no word \"program\" at the beginning.\n";
+                break;
+            case SYNT_NO_OPCURL_BRAC:
+                cout << "Syntax error: can't find '{' bracket on line " <<
+                    it.second << '\n';
+                break;
+            case SYNT_NO_CLCURL_BRAC:
+                cout << "Syntax error: can't find corresponding '}' on line " <<
+                    it.second << '\n';
+                break;
+            case SYNT_NO_SEMICOLON:
+                cout << "Syntax error: can't find ';' on line " <<
+                    it.second << '\n';
+                break;
+            case SYNT_NO_OPPAREN:
+                cout << "Syntax error: can't find '(' bracket on line " <<
+                    it.second << '\n';
+                break;
+            case SYNT_NO_CLPAREN:
+                cout << "Syntax error: can't find corresponding ')' on line " <<
+                    it.second << '\n';
+                break;
+            case SYNT_IF_ERR:
+                cout << "Syntax error: something wrong with IF on line " <<
+                    it.second << '\n';
+                break;
+            case SYNT_FOR_ERR:
+                cout << "Syntax error: something wrong with FOR on line " <<
+                     it.second << '\n';
+                break;
+            case WRONG_IDENT_NAME:
+                cout << "Wrong identifier found on line " << it.second << '\n';
+                break;
+            case WRONG_EXPR:
+                cout << "Wrong expression found on line " << it.second << '\n';
+                break;
+            case SEM_PREV_DECL:
+                cout << "Semantic error: double declaration on line " <<
+                    it.second << '\n';
+                break;
+            case SEM_WRONG_TYPE:
+                cout << "Wrong type used in expression on line " <<
+                    it.second << '\n';
+                break;
+            default:
+                break;
+        }
 }
 
 enum  TypeOfLex {
@@ -716,7 +779,7 @@ void Parser::E4() {
     E5();
     if (c_type_ == LEX_LSS || c_type_ == LEX_GTR || c_type_ == LEX_LEQ ||
         c_type_ == LEX_GEQ) {
-        E5;
+        E5();
     }
 }
 
@@ -738,7 +801,7 @@ void Parser::T() {
 void Parser::F() {
     if (c_type_ == LEX_STR) {
         GetNextLex();
-    } else if (c_type_ == LEX_ID) {
+    } else if (c_type_ == LEX_IDENT) {
         GetNextLex();
     } else if (c_type_ == LEX_NUM) {
         GetNextLex();
