@@ -671,6 +671,17 @@ void Parser::Write() {
     }
 }
 
+void Parser::ReadComplexOp() {
+    ReadOperators();
+    GetNextLex();
+    if (c_type_ != LEX_RCURL_BRACKET) {
+        err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
+    }
+}
+
+void Parser::Expression() {
+    
+
 int main() {
     Scanner prog("tests/test2");
     Lex cur_lex = prog.GetLex();
