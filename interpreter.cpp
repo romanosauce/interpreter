@@ -533,14 +533,12 @@ void Parser::ReadIf() {
     } else {
         GetNextLex();
         Expression();
-        GetNextLex();
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
         } else {
             GetNextLex();
             Operator();
-            GetNextLex();
             if (c_type_ != LEX_ELSE) {
                 err_stk.push_back({SYNT_IF_ERR, line_count});
                 ErrorHandler();
@@ -559,7 +557,6 @@ void Parser::ReadFor() {
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             Expression();
-            GetNextLex();
             if (c_type_ != LEX_SEMICOLON) {
                 err_stk.push_back({SYNT_FOR_ERR, line_count});
                 ErrorHandler();
@@ -568,7 +565,6 @@ void Parser::ReadFor() {
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             Expression();
-            GetNextLex();
             if (c_type_ != LEX_SEMICOLON) {
                 err_stk.push_back({SYNT_FOR_ERR, line_count});
                 ErrorHandler();
@@ -577,7 +573,6 @@ void Parser::ReadFor() {
         GetNextLex();
         if (c_type_ != LEX_COLON) {
             Expression();
-            GetNextLex();
             if (c_type_ != LEX_COLON) {
                 err_stk.push_back({SYNT_FOR_ERR, line_count});
                 ErrorHandler();
@@ -595,7 +590,6 @@ void Parser::ReadWhile() {
     } else {
         GetNextLex();
         Expression();
-        GetNextLex();
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
@@ -657,7 +651,6 @@ void Parser::Write() {
         do {
             GetNextLex();
             Expression();
-            GetNextLex();
         } while (c_type_ == LEX_COMMA);
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
@@ -673,7 +666,6 @@ void Parser::Write() {
 
 void Parser::ReadComplexOp() {
     ReadOperators();
-    GetNextLex();
     if (c_type_ != LEX_RCURL_BRACKET) {
         err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
     }
