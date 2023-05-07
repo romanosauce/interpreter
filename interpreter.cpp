@@ -350,7 +350,6 @@ class Parser {
         void ReadOperators();
         void Declaration();
         void Operator();
-        void Expression();
         void ReadIf();
         void ReadFor();
         void ReadWhile();
@@ -360,6 +359,14 @@ class Parser {
         void Break();
         void Goto();
         void MarkedOp();
+        void Expression();
+        void E1();
+        void E2();
+        void E3();
+        void E4();
+        void E5();
+        void T();
+        void F();
 
         void GetNextLex() {
             cur_lex_ = scan_.GetLex();
