@@ -1,4 +1,5 @@
 #include <fstream>
+#include <math.h>
 #include <new>
 #include <sstream>
 #include <iostream>
@@ -28,6 +29,7 @@ enum ErrorType {
     SYNT_IF_ERR,
     SYNT_FOR_ERR,
     WRONG_IDENT_NAME,
+    WRONG_EXPR,
     SEM_PREV_DECL,
     SEM_WRONG_TYPE
 };
@@ -672,7 +674,91 @@ void Parser::ReadComplexOp() {
 }
 
 void Parser::Expression() {
-    
+    E1();
+    if (c_type_ == LEX_ASSIGN) {
+        GetNextLex();
+        E1();
+    }
+}
+
+void Parser::E1() {
+    E2();
+    while (c_type_ == LEX_OR) {
+        GetNextLex();
+        E2();
+    }
+}
+
+void Parser::E2() {
+    E2();
+    while (c_type_ == LEX_AND) {
+        GetNextLex();
+        E3();
+    }
+}
+
+void Parser::E3() {
+    E4();
+    if (c_type_ == LEX_EQ || c_type_ == LEX_NEQ) {
+        GetNextLex();
+        E4();
+    }
+}
+
+void Parser::E4() {
+    E5();
+    if (c_type_ == LEX_LSS || c_type_ == LEX_GTR || c_type_ == LEX_LEQ ||
+        c_type_ == LEX_GEQ) {
+        E5;
+    }
+}
+
+void Parser::E5() {
+    T();
+    while (c_type_ == LEX_PLUS || c_type_ == LEX_MINUS) {
+        GetNextLex();
+        T();
+    }
+}
+
+void Parser::T() {
+    F();
+    while (c_type_ == LEX_TIMES || c_type_ == LEX_SLASH) {
+        GetNextLex();
+    }
+}
+
+void Parser::F() {
+    if (c_type_ == LEX_STR) {
+        GetNextLex();
+    } else if (c_type_ == LEX_ID) {
+        GetNextLex();
+    } else if (c_type_ == LEX_NUM) {
+        GetNextLex();
+    } else if (c_type_ == LEX_TRUE) {
+        GetNextLex();
+    } else if (c_type_ == LEX_FALSE) {
+        GetNextLex();
+    } else if (c_type_ == LEX_NOT) {
+        GetNextLex();
+        F();
+    } else if (c_type_ == LEX_MINUS) {
+        GetNextLex();
+        F();
+    } else if (c_type_ == LEX_PLUS) {
+        GetNextLex();
+        F();
+    } else if (c_type_ == LEX_LPAREN) {
+        GetNextLex();
+        Expression();
+        if (c_type_ != LEX_RPAREN) {
+            err_stk.push_back({SYNT_NO_CLPAREN, line_count});
+            ErrorHandler();
+        }
+    } else {
+        err_stk.push_back({WRONG_EXPR, line_count});
+    }
+}
 
 int main() {
     Scanner prog("tests/test2");
