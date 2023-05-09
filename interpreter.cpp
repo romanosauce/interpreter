@@ -407,6 +407,8 @@ class Parser {
         void StartAnalysis();
     private:
         Lex cur_lex_;
+        Lex prev_lex_;
+        bool have_next_lex_;
         TypeOfLex c_type_;
         int c_val_;
         Scanner scan_;
@@ -435,10 +437,24 @@ class Parser {
         void F();
 
         void GetNextLex() {
-            cur_lex_ = scan_.GetLex();
+            if (!have_next_lex_) {
+                prev_lex_ = cur_lex_;
+                cur_lex_ = scan_.GetLex();
+            } else {
+                cur_lex_ = prev_lex_;
+                have_next_lex_ = false;
+            }
             c_type_ = cur_lex_.get_type();
             c_val_ = cur_lex_.get_value();
             cout << cur_lex_;
+        }
+        void GetPrevLex() {                                                     //this function only need for marked op handling
+            Lex buf = cur_lex_;
+            cur_lex_ = prev_lex_;
+            prev_lex_ = buf;
+            have_next_lex_ = true;
+            c_type_ = cur_lex_.get_type();
+            c_val_ = cur_lex_.get_value();
         }
 };
 
@@ -595,11 +611,25 @@ void Parser::Operator() {
     } else if (c_type_ == LEX_GOTO) {
         GetNextLex();
         Goto();
+    } else if (c_type_ == LEX_IDENT) {
+        GetNextLex();
+        if (c_type_ == LEX_COLON) {
+            GetNextLex();
+            Operator();
+        } else {
+            GetPrevLex();
+            Expression();
+            if (c_type_ != LEX_SEMICOLON) {
+                err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+                ErrorHandler();
+            } else {
+                GetNextLex();
+            }
+        }
     } else if (c_type_ == LEX_NUM || c_type_ == LEX_RPAREN ||
                c_type_ == LEX_TRUE || c_type_ == LEX_FALSE ||
                c_type_ == LEX_STR || c_type_ == LEX_NOT ||
-               c_type_ == LEX_MINUS || c_type_ == LEX_PLUS ||
-               c_type_ == LEX_IDENT) {
+               c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
         Expression();
         if (c_type_ != LEX_SEMICOLON) {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
@@ -818,11 +848,6 @@ void Parser::F() {
         GetNextLex();
     } else if (c_type_ == LEX_IDENT) {
         GetNextLex();
-        if (c_type_ == LEX_COLON) {
-            GetNextLex();
-            Operator();
-            c_type_ = LEX_SEMICOLON;
-        }
     } else if (c_type_ == LEX_NUM) {
         GetNextLex();
     } else if (c_type_ == LEX_TRUE) {
