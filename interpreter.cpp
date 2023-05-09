@@ -595,18 +595,11 @@ void Parser::Operator() {
     } else if (c_type_ == LEX_GOTO) {
         GetNextLex();
         Goto();
-    } else if (c_type_ == LEX_IDENT) {
-        GetNextLex();
-        if (c_type_ == LEX_COLON) {
-            GetNextLex();
-            Operator();
-        } else {
-            Expression();
-        }
     } else if (c_type_ == LEX_NUM || c_type_ == LEX_RPAREN ||
                c_type_ == LEX_TRUE || c_type_ == LEX_FALSE ||
                c_type_ == LEX_STR || c_type_ == LEX_NOT ||
-               c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
+               c_type_ == LEX_MINUS || c_type_ == LEX_PLUS ||
+               c_type_ == LEX_IDENT) {
         Expression();
         if (c_type_ != LEX_SEMICOLON) {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
@@ -824,6 +817,11 @@ void Parser::F() {
         GetNextLex();
     } else if (c_type_ == LEX_IDENT) {
         GetNextLex();
+        if (c_type_ == LEX_COLON) {
+            GetNextLex();
+            Operator();
+            c_type_ = LEX_SEMICOLON;
+        }
     } else if (c_type_ == LEX_NUM) {
         GetNextLex();
     } else if (c_type_ == LEX_TRUE) {
