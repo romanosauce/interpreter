@@ -29,11 +29,12 @@ enum ErrorType {
     WRONG_IDENT_NAME,
     WRONG_EXPR,
     SEM_PREV_DECL,
-    SEM_WRONG_TYPE
+    SEM_WRONG_TYPE,
+    SEM_NOT_DECLARE,
+    SEM_WRONG_BREAK
 };
 
 vector<pair<ErrorType, size_t>> err_stk;
-
 
 int ErrorHandler() {
     for (auto it : err_stk) {
@@ -96,7 +97,18 @@ int ErrorHandler() {
                     it.second << '\n';
                 break;
             case SEM_WRONG_TYPE:
-                cout << "Wrong type used in expression on line " <<
+                cout <<
+                    "Semantic error: Wrong type used in expression on line " <<
+                    it.second << '\n';
+                break;
+            case SEM_NOT_DECLARE:
+                cout <<
+                    "Semantic error: use of undeclared identifier on line " <<
+                    it.second << '\n';
+                break;
+            case SEM_WRONG_BREAK:
+                cout <<
+                    "Semantic error: use of break outside cycle on line " <<
                     it.second << '\n';
                 break;
             default:
@@ -400,20 +412,32 @@ ostream &operator<<(ostream &s, Lex lexeme) {
     return s;
 }
 
+template <class T, class T_EL>
+void GetFromSt(T &st, T_EL &i) {
+    i = st.top();
+    st.pop();
+}
+
 class Parser {
     public:
         vector<Lex> poliz;
-        Parser(const string &file) : scan_(file) {}
+        Parser(const string &file) : scan_(file), cycle_count(0) {}
         void StartAnalysis();
     private:
         Lex cur_lex_;
         Lex prev_lex_;
         bool have_next_lex_;
+
         TypeOfLex c_type_;
         int c_val_;
         Scanner scan_;
-        stack<int> st_int_;
-        stack<TypeOfLex> st_lex_;
+        stack<TypeOfLex> type_stk_;
+        int cycle_count;
+        void CheckIdent();
+        void CheckOp();
+        void CheckUnary();
+        void EqBool();
+
         void ReadProgram();
         void ReadDeclarations();
         void ReadOperators();
@@ -427,6 +451,7 @@ class Parser {
         void ReadComplexOp();
         void Break();
         void Goto();
+
         void Expression();
         void E1();
         void E2();
@@ -647,6 +672,7 @@ void Parser::ReadIf() {
     } else {
         GetNextLex();
         Expression();
+        EqBool();
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
@@ -668,6 +694,7 @@ void Parser::ReadFor() {
         err_stk.push_back({SYNT_NO_OPPAREN, line_count});
         ErrorHandler();
     } else {
+        cycle_count++;
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             Expression();
@@ -679,6 +706,7 @@ void Parser::ReadFor() {
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             Expression();
+            EqBool();
             if (c_type_ != LEX_SEMICOLON) {
                 err_stk.push_back({SYNT_FOR_ERR, line_count});
                 ErrorHandler();
@@ -694,6 +722,7 @@ void Parser::ReadFor() {
         }
         GetNextLex();
         Operator();
+        cycle_count--;
     }
 }
 
@@ -702,14 +731,17 @@ void Parser::ReadWhile() {
         err_stk.push_back({SYNT_NO_OPPAREN, line_count});
         ErrorHandler();
     } else {
+        cycle_count++;
         GetNextLex();
         Expression();
+        EqBool();
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
         }
         GetNextLex();
         Operator();
+        cycle_count--;
     }
 }
 
@@ -730,6 +762,10 @@ void Parser::Break() {
     GetNextLex();
     if (c_type_ != LEX_SEMICOLON) {
         err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+        ErrorHandler();
+    }
+    if (!cycle_count) {
+        err_stk.push_back({SEM_WRONG_BREAK, line_count});
         ErrorHandler();
     }
 }
@@ -790,32 +826,40 @@ void Parser::ReadComplexOp() {
 void Parser::Expression() {
     E1();
     if (c_type_ == LEX_ASSIGN) {
+        type_stk_.push(c_type_);
         GetNextLex();
         E1();
+        CheckOp();
     }
 }
 
 void Parser::E1() {
     E2();
     while (c_type_ == LEX_OR) {
+        type_stk_.push(c_type_);
         GetNextLex();
         E2();
+        CheckOp();
     }
 }
 
 void Parser::E2() {
     E3();
     while (c_type_ == LEX_AND) {
+        type_stk_.push(c_type_);
         GetNextLex();
         E3();
+        CheckOp();
     }
 }
 
 void Parser::E3() {
     E4();
     if (c_type_ == LEX_EQ || c_type_ == LEX_NEQ) {
+        type_stk_.push(c_type_);
         GetNextLex();
         E4();
+        CheckOp();
     }
 }
 
@@ -823,46 +867,64 @@ void Parser::E4() {
     E5();
     if (c_type_ == LEX_LSS || c_type_ == LEX_GTR || c_type_ == LEX_LEQ ||
         c_type_ == LEX_GEQ) {
+        type_stk_.push(c_type_);
+        GetNextLex();
         E5();
+        CheckOp();
     }
 }
 
 void Parser::E5() {
     T();
     while (c_type_ == LEX_PLUS || c_type_ == LEX_MINUS) {
+        type_stk_.push(c_type_);
         GetNextLex();
         T();
+        CheckOp();
     }
 }
 
 void Parser::T() {
     F();
     while (c_type_ == LEX_TIMES || c_type_ == LEX_SLASH) {
+        type_stk_.push(c_type_);
         GetNextLex();
         F();
+        CheckOp();
     }
 }
 
 void Parser::F() {
     if (c_type_ == LEX_STR) {
+        type_stk_.push(LEX_STRING);
         GetNextLex();
     } else if (c_type_ == LEX_IDENT) {
+        CheckIdent();
         GetNextLex();
     } else if (c_type_ == LEX_NUM) {
+        type_stk_.push(LEX_INT);
         GetNextLex();
     } else if (c_type_ == LEX_TRUE) {
+        type_stk_.push(LEX_BOOL);
         GetNextLex();
     } else if (c_type_ == LEX_FALSE) {
+        type_stk_.push(LEX_BOOL);
         GetNextLex();
     } else if (c_type_ == LEX_NOT) {
+        type_stk_.push(LEX_NOT);
         GetNextLex();
         F();
+        CheckUnary();
     } else if (c_type_ == LEX_MINUS) {
+        type_stk_.push(LEX_MINUS);
         GetNextLex();
         F();
+        CheckUnary();
     } else if (c_type_ == LEX_PLUS) {
+        type_stk_.push(LEX_PLUS);
         GetNextLex();
         F();
+        CheckUnary();
     } else if (c_type_ == LEX_LPAREN) {
         GetNextLex();
         Expression();
@@ -873,6 +935,77 @@ void Parser::F() {
         GetNextLex();
     } else {
         err_stk.push_back({WRONG_EXPR, line_count});
+    }
+}
+
+void Parser::CheckIdent() {
+    if (TID[c_val_].get_declare()) {
+        type_stk_.push(TID[c_val_].get_type());
+    } else {
+        err_stk.push_back({SEM_NOT_DECLARE, line_count});
+        ErrorHandler();
+    }
+}
+
+void Parser::CheckOp() {
+    TypeOfLex t1, t2, op;
+    GetFromSt(type_stk_, t2);
+    GetFromSt(type_stk_, op);
+    GetFromSt(type_stk_, t1);
+
+    if (op == LEX_PLUS || op == LEX_MINUS || op == LEX_TIMES ||
+        op == LEX_SLASH) {
+        if (t1 == t2 && t1 == LEX_INT) {
+            type_stk_.push(LEX_INT);
+        } else if (t1 == t2 && t1 == LEX_STRING && op == LEX_PLUS) {
+            type_stk_.push(LEX_STRING);
+        } else {
+            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+        }
+    } else if (op == LEX_LSS || op == LEX_GTR || op == LEX_LEQ ||
+               op == LEX_GEQ || op == LEX_EQ || op == LEX_NEQ) {
+        if (t1 == t2 && (t1 == LEX_INT || t1 == LEX_STRING)) {
+            type_stk_.push(LEX_BOOL);
+        } else {
+            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+        }
+    } else if (op == LEX_AND || op == LEX_OR) {
+        if (t1 == t2 && t1 == LEX_BOOL) {
+            type_stk_.push(LEX_BOOL);
+        } else {
+            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+        }
+    } else if (op == LEX_ASSIGN) {
+        if (t1 == t2) {
+            type_stk_.push(t1);
+        } else {
+            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+        }
+    }
+}
+
+void Parser::CheckUnary() {
+    TypeOfLex op, t1;
+    GetFromSt(type_stk_, op);
+    GetFromSt(type_stk_, t1);
+    if (op == LEX_NOT) {
+        if (t1 == LEX_BOOL) {
+            type_stk_.push(LEX_BOOL);
+        } else {
+            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+        }
+    } else if (op == LEX_MINUS || op == LEX_PLUS) {
+        if (t1 == LEX_INT) {
+            type_stk_.push(LEX_INT);
+        } else {
+            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+        }
+    }
+}
+
+void Parser::EqBool() {
+    if (type_stk_.top() != LEX_BOOL) {
+        err_stk.push_back({SEM_WRONG_TYPE, line_count});
     }
 }
 

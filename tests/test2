@@ -5,11 +5,15 @@ program {
     int c = 6665;
     {
         2345;
+        while (true) {
+            
+        }
         2 + 3 * (a / 3 + 5) or 1;
         a = 2;
         gg: 
 
         b = 3;
+        c + +b + 2;
 abcd:
         if (true) {
             b = 3;
