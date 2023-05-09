@@ -1,8 +1,16 @@
 program {
-    int a = 1234;
+    int a = 1234, c = 5, k = 6;
+    string b = "abcd";
+    boolean e = true;
+    boolean t;
     a = 3;
     for (true;true;) {}
-    if (a < 1) {} else {}
-    while ("abcd" > "ed") {}
+    e = e and e;
+    e = (t and false)or true;
+    gg:
+    goto gg;
+    read(a);
+    write(a, t, e);
     while (true) {}
+    while (a > a) {}
 }

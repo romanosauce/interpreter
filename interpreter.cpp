@@ -611,7 +611,7 @@ void Parser::ReadOperators() {
            c_type_ == LEX_TRUE || c_type_ == LEX_FALSE ||
            c_type_ == LEX_STR || c_type_ == LEX_NOT ||
            c_type_ == LEX_MINUS || c_type_ == LEX_PLUS ||
-           c_type_ == LEX_RPAREN) {
+           c_type_ == LEX_LPAREN) {
         Operator();
     }
 }
@@ -762,6 +762,7 @@ void Parser::Goto() {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
             ErrorHandler();
         }
+        GetNextLex();
     }
 }
 
@@ -798,11 +799,12 @@ void Parser::Read() {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
             ErrorHandler();
         }
+        GetNextLex();
     }
 }
 
 void Parser::Write() {
-    if (c_type_ != LEX_SEMICOLON) {
+    if (c_type_ != LEX_LPAREN) {
         err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
         ErrorHandler();
     } else {
@@ -819,6 +821,7 @@ void Parser::Write() {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
             ErrorHandler();
         }
+        GetNextLex();
     }
 }
 
