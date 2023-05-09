@@ -7,6 +7,10 @@ program {
         2345;
         2 + 3 * (a / 3 + 5) or 1;
         a = 2;
-        gg: a = 2;
+        if (true) {
+            b = 3;
+        } else {
+            b = 3;
+        }
     }
 }

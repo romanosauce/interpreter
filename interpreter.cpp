@@ -754,6 +754,7 @@ void Parser::ReadComplexOp() {
     if (c_type_ != LEX_RCURL_BRACKET) {
         err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
     }
+    GetNextLex();
 }
 
 void Parser::Expression() {
