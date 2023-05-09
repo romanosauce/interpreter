@@ -28,6 +28,7 @@ enum ErrorType {
     SYNT_FOR_ERR,
     WRONG_IDENT_NAME,
     WRONG_EXPR,
+    WRONG_OP,
     SEM_PREV_DECL,
     SEM_WRONG_TYPE,
     SEM_NOT_DECLARE,
@@ -91,6 +92,9 @@ int ErrorHandler() {
                 break;
             case WRONG_EXPR:
                 cout << "Wrong expression found on line " << it.second << '\n';
+                break;
+            case WRONG_OP:
+                cout << "Wrong operator on line " << it.second << '\n';
                 break;
             case SEM_PREV_DECL:
                 cout << "Semantic error: double declaration on line " <<
@@ -662,6 +666,9 @@ void Parser::Operator() {
         } else {
             GetNextLex();
         }
+    } else {
+        err_stk.push_back({WRONG_OP, line_count});
+        ErrorHandler();
     }
 }
 
