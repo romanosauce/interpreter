@@ -1,0 +1,9 @@
+program {
+    int a = 1234;
+    a = 3;
+    for (;true;) {
+        break;
+    }
+    if (a < 1) {} else {}
+    while ("abcd" > "ed") {}
+}

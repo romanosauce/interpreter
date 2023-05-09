@@ -713,9 +713,9 @@ void Parser::ReadFor() {
             }
         }
         GetNextLex();
-        if (c_type_ != LEX_COLON) {
+        if (c_type_ != LEX_RPAREN) {
             Expression();
-            if (c_type_ != LEX_COLON) {
+            if (c_type_ != LEX_RPAREN) {
                 err_stk.push_back({SYNT_FOR_ERR, line_count});
                 ErrorHandler();
             }
@@ -768,6 +768,7 @@ void Parser::Break() {
         err_stk.push_back({SEM_WRONG_BREAK, line_count});
         ErrorHandler();
     }
+    GetNextLex();
 }
 
 void Parser::Read() {
@@ -1010,7 +1011,7 @@ void Parser::EqBool() {
 }
 
 int main() {
-    Scanner prog("tests/test2");
+    Scanner prog("tests/test3");
     Lex cur_lex = prog.GetLex();
     while (cur_lex.get_type() != LEX_FIN) {
         cout << cur_lex;
@@ -1018,7 +1019,7 @@ int main() {
     }
     TID.clear();
     line_count = 0;
-    Parser test_prog("tests/test2");
+    Parser test_prog("tests/test3");
     test_prog.StartAnalysis();
     cout << "end\n";
 }
