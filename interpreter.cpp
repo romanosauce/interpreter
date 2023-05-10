@@ -34,7 +34,8 @@ enum ErrorType {
     SEM_NOT_DECLARE,
     SEM_WRONG_BREAK,
     SEM_ASSIGN_TO_UNMUT,
-    SEM_WRONG_LABLE
+    SEM_WRONG_LABLE,
+    SEM_UNKNW_LABLE
 };
 
 vector<pair<ErrorType, size_t>> err_stk;
@@ -127,6 +128,11 @@ int ErrorHandler() {
                     "Semantic error: wrong lable on line " <<
                     it.second << '\n';
                 break;
+            case SEM_UNKNW_LABLE:
+                cout <<
+                    "I've done my best to find lable for some goto" <<
+                    ", but I didn't manage to. I can't even tell you " <<
+                    "the line with problem. Sorry user :(\n";
             default:
                 break;
         }
@@ -140,7 +146,7 @@ enum TypeOfLex {
     LEX_AND, LEX_BOOL, LEX_DO, LEX_ELSE, LEX_END, LEX_IF, LEX_FALSE,
     LEX_INT, LEX_NOT, LEX_OR, LEX_PROGRAM, LEX_READ, LEX_THEN, LEX_TRUE,
     LEX_WHILE, LEX_WRITE, LEX_STRING, LEX_FIN, LEX_CONTINUE,
-    LEX_BREAK, LEX_GOTO, LEX_FOR,
+    LEX_BREAK, LEX_GOTO, LEX_FOR, LEX_LABLE,
 
     LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_ASSIGN, LEX_LPAREN, LEX_RPAREN,
     LEX_LCURL_BRACKET, LEX_RCURL_BRACKET, LEX_EQ, LEX_LSS, LEX_GTR, LEX_PLUS, 
@@ -515,8 +521,13 @@ void Parser::StartAnalysis() {
         visit([](auto&& arg){ std::cout << arg; }, it.get_value());
         cout << '\n';
     }
+    GetNextLex();
     if (c_type_ != LEX_FIN) {
         err_stk.push_back({SYNT_LEX_AFTER_END, line_count});
+        ErrorHandler();
+    }
+    if (!unknw_lables.empty()) {
+        err_stk.push_back({SEM_UNKNW_LABLE, line_count});
         ErrorHandler();
     }
 }
@@ -661,15 +672,19 @@ void Parser::Operator() {
         Lex lex_copy = cur_lex_;
         GetNextLex();
         if (c_type_ == LEX_COLON) {
-            if (TID[lex_copy.get_value()].get_assign()) {
+            size_t i = lex_copy.get_value();
+            if (TID[i].get_declare()) {
                 err_stk.push_back({SEM_WRONG_LABLE, line_count});
                 ErrorHandler();
             } else {
-                TID[lex_copy.get_value()].set_value(poliz.size());
-                TID[lex_copy.get_value()].set_assign();
-                for (auto it : unknw_lables[lex_copy.get_value()]) {
+                TID[i].set_type(LEX_LABLE);
+                TID[i].set_value((int) poliz.size());
+                TID[i].set_declare();
+                TID[i].set_assign();
+                for (auto it : unknw_lables[i]) {
                     poliz[it] = Lex(POLIZ_LABEL, poliz.size());
                 }
+                unknw_lables.erase(i);
             }
             GetNextLex();
             Operator();
@@ -822,11 +837,16 @@ void Parser::Goto() {
         err_stk.push_back({WRONG_IDENT_NAME, line_count});
         ErrorHandler();
     } else {
-        if (!TID[c_val_].get_assign()) {
+        if (TID[c_val_].get_declare()) {
+            if (TID[c_val_].get_type() != LEX_LABLE) {
+                err_stk.push_back({SEM_WRONG_LABLE, line_count});
+                ErrorHandler();
+            } else {
+                poliz.push_back(Lex(POLIZ_LABEL, c_val_));
+            }
+        } else {
             unknw_lables[c_val_].push_back(poliz.size());
             poliz.push_back(Lex());
-        } else {
-            poliz.push_back(Lex(POLIZ_LABEL, c_val_));
         }
         poliz.push_back(Lex(POLIZ_GO));
         GetNextLex();

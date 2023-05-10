@@ -6,11 +6,11 @@ program {
     a = 3;
     for (true;true;) {}
     e = e and e;
-    1 + 2 = 3 + 4;
-    e = (t and false)or true;
     gg:
+    e = (t and false)or true;
     goto gg;
     read(a);
+    goto gg;
     write(a, t, e);
     while (true) {}
     while (a > a) {}
