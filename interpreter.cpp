@@ -748,6 +748,9 @@ void Parser::ReadIf() {
     }
 }
 
+vector<vector<int>> break_stack;
+int cycle_depth = 0;
+
 void Parser::ReadFor() {
     int sec_exp_st;
     int lable_to_jmp_after_sec_exp;
@@ -758,6 +761,10 @@ void Parser::ReadFor() {
         ErrorHandler();
     } else {
         cycle_count++;
+        if (cycle_depth < cycle_count) {
+            break_stack.push_back({});
+            cycle_depth++;
+        }
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             Expression();
@@ -801,6 +808,10 @@ void Parser::ReadFor() {
         poliz.push_back(Lex(POLIZ_LABEL, thrd_exp_st));
         poliz.push_back(Lex(POLIZ_GO));
         poliz[lable_to_jmp_after_sec_exp] = Lex(POLIZ_LABEL, poliz.size());
+        for (int i : break_stack[cycle_count-1]) {
+            poliz[i] = Lex(POLIZ_LABEL, poliz.size());
+        }
+        break_stack[cycle_count-1] = {};
         cycle_count--;
     }
 }
@@ -859,13 +870,16 @@ void Parser::Goto() {
 }
 
 void Parser::Break() {
+    if (!cycle_count) {
+        err_stk.push_back({SEM_WRONG_BREAK, line_count});
+        ErrorHandler();
+    }
+    break_stack[cycle_count-1].push_back(poliz.size());
+    poliz.push_back(Lex());
+    poliz.push_back(Lex(POLIZ_GO));
     GetNextLex();
     if (c_type_ != LEX_SEMICOLON) {
         err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
-        ErrorHandler();
-    }
-    if (!cycle_count) {
-        err_stk.push_back({SEM_WRONG_BREAK, line_count});
         ErrorHandler();
     }
     GetNextLex();
