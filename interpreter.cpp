@@ -815,11 +815,17 @@ void Parser::Read() {
             err_stk.push_back({WRONG_IDENT_NAME, line_count});
             ErrorHandler();
         }
+        if (!TID[c_val_].get_declare()) {
+            err_stk.push_back({SEM_NOT_DECLARE, line_count});
+            ErrorHandler();
+        }
+        poliz.push_back(Lex(POLIZ_ADDRESS, c_val_));
         GetNextLex();
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
         }
+        poliz.push_back(Lex(LEX_READ));
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
@@ -834,7 +840,9 @@ void Parser::Write() {
         err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
         ErrorHandler();
     } else {
+        int exp_num = 0;
         do {
+            exp_num++;
             GetNextLex();
             Expression();
         } while (c_type_ == LEX_COMMA);
@@ -842,6 +850,7 @@ void Parser::Write() {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
         }
+        poliz.push_back(Lex(LEX_WRITE, exp_num));
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
