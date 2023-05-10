@@ -32,7 +32,8 @@ enum ErrorType {
     SEM_PREV_DECL,
     SEM_WRONG_TYPE,
     SEM_NOT_DECLARE,
-    SEM_WRONG_BREAK
+    SEM_WRONG_BREAK,
+    SEM_ASSIGN_TO_UNMUT
 };
 
 vector<pair<ErrorType, size_t>> err_stk;
@@ -115,6 +116,11 @@ int ErrorHandler() {
                     "Semantic error: use of break outside cycle on line " <<
                     it.second << '\n';
                 break;
+            case SEM_ASSIGN_TO_UNMUT:
+                cout <<
+                    "Semantic error: assigning to unmutable object on line " <<
+                    it.second << '\n';
+                break;
             default:
                 break;
         }
@@ -122,7 +128,7 @@ int ErrorHandler() {
     exit(0);
 }
 
-enum  TypeOfLex {
+enum TypeOfLex {
     LEX_NULL,
 
     LEX_AND, LEX_BOOL, LEX_DO, LEX_ELSE, LEX_END, LEX_IF, LEX_FALSE,
@@ -136,6 +142,9 @@ enum  TypeOfLex {
     LEX_STR, LEX_PERCENT, LEX_QUOTE,
 
     LEX_IDENT,
+
+    POLIZ_GO, POLIZ_FGO, POLIZ_LABEL, POLIZ_ADDRESS,
+    LEX_UN_MINUS, LEX_UN_PLUS
 };
 
 class Lex {
@@ -367,7 +376,6 @@ map<string, TypeOfLex> Scanner::delimeters_ = {
 
 Lex Scanner::GetLex() {
     SkipSpaces();
-    //cout << "CHAR: " << cur_char_ << '\n';
     if (isalpha(cur_char_)) {
         string buf = GetWord();
         if (reserved_words_.find(buf) != reserved_words_.end()) {
@@ -456,6 +464,7 @@ class Parser {
         void Break();
         void Goto();
 
+        bool mut_;
         void Expression();
         void E1();
         void E2();
@@ -835,8 +844,13 @@ void Parser::ReadComplexOp() {
 }
 
 void Parser::Expression() {
+    mut_ = true;
     E1();
     if (c_type_ == LEX_ASSIGN) {
+        if (!mut_) {
+            err_stk.push_back({SEM_ASSIGN_TO_UNMUT, line_count});
+            ErrorHandler();
+        }
         type_stk_.push(c_type_);
         GetNextLex();
         E1();
@@ -847,6 +861,7 @@ void Parser::Expression() {
 void Parser::E1() {
     E2();
     while (c_type_ == LEX_OR) {
+        mut_ = false;
         type_stk_.push(c_type_);
         GetNextLex();
         E2();
@@ -857,6 +872,7 @@ void Parser::E1() {
 void Parser::E2() {
     E3();
     while (c_type_ == LEX_AND) {
+        mut_ = false;
         type_stk_.push(c_type_);
         GetNextLex();
         E3();
@@ -867,6 +883,7 @@ void Parser::E2() {
 void Parser::E3() {
     E4();
     if (c_type_ == LEX_EQ || c_type_ == LEX_NEQ) {
+        mut_ = false;
         type_stk_.push(c_type_);
         GetNextLex();
         E4();
@@ -878,6 +895,7 @@ void Parser::E4() {
     E5();
     if (c_type_ == LEX_LSS || c_type_ == LEX_GTR || c_type_ == LEX_LEQ ||
         c_type_ == LEX_GEQ) {
+        mut_ = false;
         type_stk_.push(c_type_);
         GetNextLex();
         E5();
@@ -888,6 +906,7 @@ void Parser::E4() {
 void Parser::E5() {
     T();
     while (c_type_ == LEX_PLUS || c_type_ == LEX_MINUS) {
+        mut_ = false;
         type_stk_.push(c_type_);
         GetNextLex();
         T();
@@ -898,6 +917,7 @@ void Parser::E5() {
 void Parser::T() {
     F();
     while (c_type_ == LEX_TIMES || c_type_ == LEX_SLASH) {
+        mut_ = false;
         type_stk_.push(c_type_);
         GetNextLex();
         F();
@@ -908,35 +928,44 @@ void Parser::T() {
 void Parser::F() {
     if (c_type_ == LEX_STR) {
         type_stk_.push(LEX_STRING);
+        poliz.push_back(cur_lex_);
         GetNextLex();
     } else if (c_type_ == LEX_IDENT) {
         CheckIdent();
+        poliz.push_back(cur_lex_);
         GetNextLex();
     } else if (c_type_ == LEX_NUM) {
         type_stk_.push(LEX_INT);
+        poliz.push_back(cur_lex_);
         GetNextLex();
     } else if (c_type_ == LEX_TRUE) {
         type_stk_.push(LEX_BOOL);
+        poliz.push_back(cur_lex_);
         GetNextLex();
     } else if (c_type_ == LEX_FALSE) {
         type_stk_.push(LEX_BOOL);
+        poliz.push_back(cur_lex_);
         GetNextLex();
     } else if (c_type_ == LEX_NOT) {
+        mut_ = false;
         type_stk_.push(LEX_NOT);
         GetNextLex();
         F();
         CheckUnary();
     } else if (c_type_ == LEX_MINUS) {
+        mut_ = false;
         type_stk_.push(LEX_MINUS);
         GetNextLex();
         F();
         CheckUnary();
     } else if (c_type_ == LEX_PLUS) {
+        mut_ = false;
         type_stk_.push(LEX_PLUS);
         GetNextLex();
         F();
         CheckUnary();
     } else if (c_type_ == LEX_LPAREN) {
+        mut_ = false;
         GetNextLex();
         Expression();
         if (c_type_ != LEX_RPAREN) {
@@ -993,11 +1022,13 @@ void Parser::CheckOp() {
             err_stk.push_back({SEM_WRONG_TYPE, line_count});
         }
     }
+    poliz.push_back(Lex(op));
 }
 
 void Parser::CheckUnary() {
     TypeOfLex op, t1;
     GetFromSt(type_stk_, op);
+    TypeOfLex un_op = op;
     GetFromSt(type_stk_, t1);
     if (op == LEX_NOT) {
         if (t1 == LEX_BOOL) {
@@ -1006,12 +1037,14 @@ void Parser::CheckUnary() {
             err_stk.push_back({SEM_WRONG_TYPE, line_count});
         }
     } else if (op == LEX_MINUS || op == LEX_PLUS) {
+        un_op = op == LEX_MINUS ? LEX_UN_MINUS : LEX_UN_PLUS;
         if (t1 == LEX_INT) {
             type_stk_.push(LEX_INT);
         } else {
             err_stk.push_back({SEM_WRONG_TYPE, line_count});
         }
     }
+    poliz.push_back(Lex(un_op));
 }
 
 void Parser::EqBool() {
