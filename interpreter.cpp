@@ -844,14 +844,17 @@ void Parser::ReadComplexOp() {
 }
 
 void Parser::Expression() {
-    mut_ = true;
+    mut_ = false;
     E1();
-    if (c_type_ == LEX_ASSIGN) {
+    while (c_type_ == LEX_ASSIGN) {
         if (!mut_) {
             err_stk.push_back({SEM_ASSIGN_TO_UNMUT, line_count});
             ErrorHandler();
         }
+        poliz.pop_back();                                                       //used to remove LEX_IDENT from poliz stack and replace it with address
+        poliz.push_back(Lex(POLIZ_ADDRESS, c_val_));
         type_stk_.push(c_type_);
+        mut_ = false;
         GetNextLex();
         E1();
         CheckOp();
@@ -932,6 +935,7 @@ void Parser::F() {
         GetNextLex();
     } else if (c_type_ == LEX_IDENT) {
         CheckIdent();
+        mut_ = true;
         poliz.push_back(cur_lex_);
         GetNextLex();
     } else if (c_type_ == LEX_NUM) {
