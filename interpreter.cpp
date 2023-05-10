@@ -33,7 +33,8 @@ enum ErrorType {
     SEM_WRONG_TYPE,
     SEM_NOT_DECLARE,
     SEM_WRONG_BREAK,
-    SEM_ASSIGN_TO_UNMUT
+    SEM_ASSIGN_TO_UNMUT,
+    SEM_WRONG_LABLE
 };
 
 vector<pair<ErrorType, size_t>> err_stk;
@@ -119,6 +120,11 @@ int ErrorHandler() {
             case SEM_ASSIGN_TO_UNMUT:
                 cout <<
                     "Semantic error: assigning to unmutable object on line " <<
+                    it.second << '\n';
+                break;
+            case SEM_WRONG_LABLE:
+                cout <<
+                    "Semantic error: wrong lable on line " <<
                     it.second << '\n';
                 break;
             default:
@@ -430,6 +436,8 @@ void GetFromSt(T &st, T_EL &i) {
     st.pop();
 }
 
+map<int, vector<int>> unknw_lables;
+
 class Parser {
     public:
         vector<Lex> poliz;
@@ -650,8 +658,19 @@ void Parser::Operator() {
         GetNextLex();
         Goto();
     } else if (c_type_ == LEX_IDENT) {
+        Lex lex_copy = cur_lex_;
         GetNextLex();
         if (c_type_ == LEX_COLON) {
+            if (TID[lex_copy.get_value()].get_assign()) {
+                err_stk.push_back({SEM_WRONG_LABLE, line_count});
+                ErrorHandler();
+            } else {
+                TID[lex_copy.get_value()].set_value(poliz.size());
+                TID[lex_copy.get_value()].set_assign();
+                for (auto it : unknw_lables[lex_copy.get_value()]) {
+                    poliz[it] = Lex(POLIZ_LABEL, poliz.size());
+                }
+            }
             GetNextLex();
             Operator();
         } else {
@@ -803,6 +822,13 @@ void Parser::Goto() {
         err_stk.push_back({WRONG_IDENT_NAME, line_count});
         ErrorHandler();
     } else {
+        if (!TID[c_val_].get_assign()) {
+            unknw_lables[c_val_].push_back(poliz.size());
+            poliz.push_back(Lex());
+        } else {
+            poliz.push_back(Lex(POLIZ_LABEL, c_val_));
+        }
+        poliz.push_back(Lex(POLIZ_GO));
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
