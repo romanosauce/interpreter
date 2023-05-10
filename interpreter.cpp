@@ -752,20 +752,28 @@ void Parser::ReadFor() {
 }
 
 void Parser::ReadWhile() {
+    int pl0, pl1;
     if (c_type_ != LEX_LPAREN) {
         err_stk.push_back({SYNT_NO_OPPAREN, line_count});
         ErrorHandler();
     } else {
         cycle_count++;
+        pl0 = poliz.size();
         GetNextLex();
         Expression();
         EqBool();
+        pl1 = poliz.size();
+        poliz.push_back(Lex());
+        poliz.push_back(Lex(POLIZ_FGO));
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
         }
         GetNextLex();
         Operator();
+        poliz.push_back(Lex(POLIZ_LABEL, pl0));
+        poliz.push_back(Lex(POLIZ_GO));
+        poliz[pl1] = Lex(POLIZ_LABEL, poliz.size());
         cycle_count--;
     }
 }
