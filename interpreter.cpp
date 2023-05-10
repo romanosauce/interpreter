@@ -715,6 +715,10 @@ void Parser::ReadIf() {
 }
 
 void Parser::ReadFor() {
+    int sec_exp_st;
+    int lable_to_jmp_after_sec_exp;
+    int lable_to_skip_thrd_exp;
+    int thrd_exp_st;
     if (c_type_ != LEX_LPAREN) {
         err_stk.push_back({SYNT_NO_OPPAREN, line_count});
         ErrorHandler();
@@ -728,6 +732,7 @@ void Parser::ReadFor() {
                 ErrorHandler();
             }
         }
+        sec_exp_st = poliz.size();
         GetNextLex();
         if (c_type_ != LEX_SEMICOLON) {
             Expression();
@@ -736,7 +741,16 @@ void Parser::ReadFor() {
                 err_stk.push_back({SYNT_FOR_ERR, line_count});
                 ErrorHandler();
             }
+        } else {
+            poliz.push_back(Lex(LEX_TRUE));
         }
+        lable_to_jmp_after_sec_exp = poliz.size();
+        poliz.push_back(Lex());
+        poliz.push_back(Lex(POLIZ_FGO));
+        lable_to_skip_thrd_exp = poliz.size();
+        poliz.push_back(Lex());
+        poliz.push_back(Lex(POLIZ_GO));
+        thrd_exp_st = poliz.size();
         GetNextLex();
         if (c_type_ != LEX_RPAREN) {
             Expression();
@@ -745,8 +759,14 @@ void Parser::ReadFor() {
                 ErrorHandler();
             }
         }
+        poliz.push_back(Lex(POLIZ_LABEL, sec_exp_st));
+        poliz.push_back(Lex(POLIZ_GO));
+        poliz[lable_to_skip_thrd_exp] = Lex(POLIZ_LABEL, poliz.size());
         GetNextLex();
         Operator();
+        poliz.push_back(Lex(POLIZ_LABEL, thrd_exp_st));
+        poliz.push_back(Lex(POLIZ_GO));
+        poliz[lable_to_jmp_after_sec_exp] = Lex(POLIZ_LABEL, poliz.size());
         cycle_count--;
     }
 }
