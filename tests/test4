@@ -1,0 +1,21 @@
+program {
+    int a = 5;
+    int i, j;
+    boolean flag = true;
+    gg:
+    for (i = 0; i < 5; i = i + 1) {
+        write(i);
+        for (j = 1; j < 5; j = j + 1) {
+            write(j);
+            break;
+        }
+    }
+    if (flag) {
+    } else {}
+    read(a);
+    write("abc ", a);
+    write(a+a);
+    write(5 + 3 * (a + a - 1) - (2 + 2));
+    bb:
+    write(1);
+}

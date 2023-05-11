@@ -34,7 +34,8 @@ enum ErrorType {
     SEM_WRONG_BREAK,
     SEM_ASSIGN_TO_UNMUT,
     SEM_WRONG_LABLE,
-    SEM_UNKNW_LABLE
+    SEM_UNKNW_LABLE,
+    RUNTIME_ZERO_DIV
 };
 
 vector<pair<ErrorType, size_t>> err_stk;
@@ -132,6 +133,10 @@ int ErrorHandler() {
                     "I've done my best to find lable for some goto" <<
                     ", but I didn't manage to. I can't even tell you " <<
                     "the line with problem. Sorry user :(\n";
+                break;
+            case RUNTIME_ZERO_DIV:
+                cout << "Runtime error: zero division\n";
+                break;
             default:
                 break;
         }
@@ -208,10 +213,10 @@ class Ident {
         void set_assign() {
             assign_ = true;
         }
-        variant<int, bool, string> get_value() const {
+        variant<int, string> get_value() const {
             return value_;
         }
-        void set_value(const variant<int, bool, string> &v) {
+        void set_value(const variant<int, string> &v) {
             value_ = v;
         }
     private:
@@ -219,7 +224,7 @@ class Ident {
         bool declare_;
         bool assign_;
         TypeOfLex type_;
-        variant<int, bool, string> value_;
+        variant<int, string> value_;
 };
 
 vector<Ident> TID;
@@ -626,7 +631,7 @@ void Parser::Declaration() {
                     TID[index].set_value(cur_lex_.get_value());
                     TID[index].set_assign();
                 } else if (c_type_ == LEX_TRUE || c_type_ == LEX_FALSE) {
-                    TID[index].set_value((c_type_ == LEX_TRUE ? true : false));
+                    TID[index].set_value((c_type_ == LEX_TRUE ? 1 : 0));
                     TID[index].set_assign();
                 } else {
                     err_stk.push_back({SEM_WRONG_TYPE, line_count});
@@ -1179,27 +1184,230 @@ class Executer {
         void execute(vector<Lex> &poliz);
 };
 
-//void Executer::execute(vector<Lex> &poliz) {
-    //Lex cur_lex;
-    //stack<variant<int, bool, string>> args;
-    //size_t i, j, cur_i, size = poliz.size();
-    //while (cur_i < size) {
-        //cur_lex = poliz[cur_i];
-        //switch (cur_lex.get_type()) {
-            //case LEX_TRUE:
-            //case LEX_FALSE:
-            //case LEX_NUM:
-            //case POLIZ_ADDRESS:
-            //case POLIZ_LABEL:
-                //args.push(cur_lex.get_value());
-                //break;
-            //case LEX_STR:
-                //args.push(cur_lex.get_holder());
-                //break;
-            //case LEX_IDENT:
-                //i = cur_lex.get_value();
-                //if (TID[i].get_assign()) {
-                    
+void Executer::execute(vector<Lex> &poliz) {
+    Lex cur_lex;
+    vector<variant<int, string>> args;
+    size_t i, size = poliz.size();
+    size_t cur_i = 0;
+    int res;
+    while (cur_i < size) {
+        cur_lex = poliz[cur_i];
+        switch (cur_lex.get_type()) {
+            case LEX_TRUE:
+            case LEX_FALSE:
+            case LEX_NUM:
+            case POLIZ_ADDRESS:
+            case POLIZ_LABEL:
+                args.push_back(cur_lex.get_value());
+                break;
+            case LEX_STR:
+                args.push_back(cur_lex.get_holder());
+                break;
+            case LEX_IDENT:
+                i = cur_lex.get_value();
+                if (TID[i].get_type() == LEX_STRING) {
+                    args.push_back(get<string>(TID[i].get_value()));
+                } else {
+                    args.push_back(get<int>(TID[i].get_value()));
+                }
+                break;
+            case LEX_NOT:
+                get<int>(args[args.size()-1]) = !get<int>(args[args.size()-1]);
+                break;
+            case LEX_AND:
+                res = get<int>(args[args.size()-1]) && 
+                      get<int>(args[args.size()-2]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_OR:
+                res = get<int>(args[args.size()-1]) || 
+                      get<int>(args[args.size()-2]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_PLUS:
+                if (holds_alternative<string>(args[args.size()-1])) {
+                    string string_res;
+                    string_res = get<string>(args[args.size()-2]) +
+                                 get<string>(args[args.size()-1]);
+                    args.pop_back();
+                    args.pop_back();
+                    args.push_back(string_res);
+                } else {
+                    res = get<int>(args[args.size()-1]) + 
+                          get<int>(args[args.size()-2]);
+                    args.pop_back();
+                    args.pop_back();
+                    args.push_back(res);
+                }
+                break;
+            case LEX_MINUS:
+                res = get<int>(args[args.size()-2]) - 
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_UN_PLUS:
+                res = +get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_UN_MINUS:
+                res = -get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_TIMES:
+                res = get<int>(args[args.size()-1]) * 
+                      get<int>(args[args.size()-2]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_SLASH:
+                if (!get<int>(args[args.size()-1])) {
+                    err_stk.push_back({RUNTIME_ZERO_DIV, 0});
+                    ErrorHandler();
+                }
+                res = get<int>(args[args.size()-2]) /
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_EQ:
+                res = get<int>(args[args.size()-2]) ==
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_LSS:
+                res = get<int>(args[args.size()-2]) <
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_GTR:
+                res = get<int>(args[args.size()-2]) >
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_LEQ:
+                res = get<int>(args[args.size()-2]) <=
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_GEQ:
+                res = get<int>(args[args.size()-2]) >=
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_NEQ:
+                res = get<int>(args[args.size()-2]) !=
+                      get<int>(args[args.size()-1]);
+                args.pop_back();
+                args.pop_back();
+                args.push_back(res);
+                break;
+            case LEX_ASSIGN:
+                i = get<int>(args[args.size()-2]);
+                if (TID[i].get_type() == LEX_STRING) {
+                    string v;
+                    TID[i].set_value(v = get<string>(args[args.size()-1]));
+                    args.pop_back();
+                    args.pop_back();
+                    args.push_back(v);
+                } else {
+                    TID[i].set_value(res = get<int>(args[args.size()-1]));
+                    args.pop_back();
+                    args.pop_back();
+                    args.push_back(res);
+                }
+                break;
+            case POLIZ_GO:
+                cur_i = get<int>(args[args.size()-1]) - 1;
+                args.pop_back();
+                break;
+            case POLIZ_FGO:
+                if (!(get<int>(args[args.size()-2]))) {
+                    cur_i = get<int>(args[args.size()-1]) - 1;
+                }
+                args.pop_back();
+                args.pop_back();
+                break;
+            case LEX_WRITE:
+                for (int j = cur_lex.get_value(); j > 0; --j) {
+                    visit([](auto&& arg){ std::cout << arg; }, 
+                             args[args.size()-j]);
+                }
+                cout << '\n';
+                for (int j = 0; j < cur_lex.get_value(); ++j) {
+                    args.pop_back();
+                }
+                break;
+            case LEX_READ:
+                i = get<int>(args[args.size()-1]);
+                args.pop_back();
+                if (TID[i].get_type() == LEX_INT) {
+                    int k;
+                    cout << "Input int value for " << TID[i].get_name() << endl;
+                    cin >> k;
+                    TID[i].set_value(k);
+                    args.push_back(k);
+                } else if (TID[i].get_type() == LEX_BOOL) {
+                    string j;
+                    while (1) {
+                        cout << "Input boolean value (true of false) for " <<
+                        TID[i].get_name() << endl;
+                        cin >> j;
+                        if (j != "true" && j != "false") {
+                            cout << "Try again\n";
+                            continue;
+                        }
+                        args.push_back(j == "true" ? 1 : 0);
+                        break;
+                    }
+                } else {
+                    string j;
+                    cout << "Input string for " << TID[i].get_name() << endl;
+                    cin >> j;
+                    TID[i].set_value(j);
+                    args.push_back(j);
+                }
+                break;
+            default:
+                break;
+        }
+        ++cur_i;
+    }
+    cout << "FINISH\n";
+}
+
+class Interpretator {
+    public:
+        Interpretator(const string &program) : pars(program) {}
+        void Interpretation();
+    private:
+        Parser pars;
+        Executer E;
+};
+
+void Interpretator::Interpretation() {
+    pars.StartAnalysis();
+    E.execute(pars.poliz);
+}
 
 int main() {
     Scanner prog("tests/test3");
@@ -1212,5 +1420,9 @@ int main() {
     line_count = 0;
     Parser test_prog("tests/test3");
     test_prog.StartAnalysis();
+    TID.clear();
+    line_count = 0;
+    Interpretator pret("tests/test4");
+    pret.Interpretation();
     cout << "end\n";
 }
