@@ -6,6 +6,7 @@ program {
     a = 3;
     for (true;true;) {}
     e = e and e;
+    b = "aaa";
     gg:
     e = (t and false)or true;
     goto gg;

@@ -11,7 +11,6 @@
 using namespace std;
 
 size_t line_count = 0;
-
 enum ErrorType {
     FILE_BAD = -1,
     COMM_NO_CLOSE,
@@ -391,8 +390,14 @@ Lex Scanner::GetLex() {
     if (isalpha(cur_char_)) {
         string buf = GetWord();
         if (reserved_words_.find(buf) != reserved_words_.end()) {
-            return Lex((TypeOfLex) reserved_words_[buf],
-                       (int) reserved_words_[buf], buf);
+            if (reserved_words_[buf] == LEX_TRUE || 
+                reserved_words_[buf] == LEX_FALSE) {
+                return Lex(reserved_words_[buf], 
+                           reserved_words_[buf] == LEX_TRUE ? 1 : 0);
+            } else {
+                return Lex((TypeOfLex) reserved_words_[buf],
+                           (int) reserved_words_[buf], buf);
+            }
         } else {
             vector<Ident>::iterator it;
             if ((it = find(TID.begin(), TID.end(), buf)) != TID.end()) {
@@ -551,6 +556,10 @@ void Parser::ReadProgram() {
     if (c_type_ != LEX_RCURL_BRACKET) {
         err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
         ErrorHandler();
+    }
+    cout << "-----------------------------\n";
+    for (Lex l : poliz) {
+        cout << l;
     }
 }
 
@@ -957,8 +966,9 @@ void Parser::Expression() {
             err_stk.push_back({SEM_ASSIGN_TO_UNMUT, line_count});
             ErrorHandler();
         }
+        Lex ident_lex = poliz.back();
         poliz.pop_back();                                                       //used to remove LEX_IDENT from poliz stack and replace it with address
-        poliz.push_back(Lex(POLIZ_ADDRESS, c_val_));
+        poliz.push_back(Lex(POLIZ_ADDRESS, ident_lex.get_value()));
         type_stk_.push(c_type_);
         mut_ = false;
         GetNextLex();
@@ -1162,6 +1172,33 @@ void Parser::EqBool() {
         err_stk.push_back({SEM_WRONG_TYPE, line_count});
     }
 }
+
+class Executer {
+    public:
+        void execute(vector<Lex> &poliz);
+};
+
+//void Executer::execute(vector<Lex> &poliz) {
+    //Lex cur_lex;
+    //stack<variant<int, bool, string>> args;
+    //size_t i, j, cur_i, size = poliz.size();
+    //while (cur_i < size) {
+        //cur_lex = poliz[cur_i];
+        //switch (cur_lex.get_type()) {
+            //case LEX_TRUE:
+            //case LEX_FALSE:
+            //case LEX_NUM:
+            //case POLIZ_ADDRESS:
+            //case POLIZ_LABEL:
+                //args.push(cur_lex.get_value());
+                //break;
+            //case LEX_STR:
+                //args.push(cur_lex.get_holder());
+                //break;
+            //case LEX_IDENT:
+                //i = cur_lex.get_value();
+                //if (TID[i].get_assign()) {
+                    
 
 int main() {
     Scanner prog("tests/test3");
