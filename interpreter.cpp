@@ -862,7 +862,8 @@ void Parser::Goto() {
                 err_stk.push_back({SEM_WRONG_LABLE, line_count});
                 ErrorHandler();
             } else {
-                poliz.push_back(Lex(POLIZ_LABEL, c_val_));
+                poliz.push_back(Lex(POLIZ_LABEL,
+                                get<int>(TID[c_val_].get_value())));
             }
         } else {
             unknw_lables[c_val_].push_back(poliz.size());
