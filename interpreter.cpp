@@ -457,7 +457,8 @@ map<int, vector<int>> unknw_lables;
 class Parser {
     public:
         vector<Lex> poliz;
-        Parser(const string &file) : scan_(file), cycle_count(0) {}
+        Parser(const string &file) : have_next_lex_(false), scan_(file),
+                                     cycle_count(0) {}
         void StartAnalysis();
     private:
         Lex cur_lex_;
@@ -837,6 +838,10 @@ void Parser::ReadWhile() {
         ErrorHandler();
     } else {
         cycle_count++;
+        if (cycle_depth < cycle_count) {
+            break_stack.push_back({});
+            cycle_depth++;
+        }
         pl0 = poliz.size();
         GetNextLex();
         Expression();
@@ -853,6 +858,10 @@ void Parser::ReadWhile() {
         poliz.push_back(Lex(POLIZ_LABEL, pl0));
         poliz.push_back(Lex(POLIZ_GO));
         poliz[pl1] = Lex(POLIZ_LABEL, poliz.size());
+        for (int i : break_stack[cycle_count-1]) {
+            poliz[i] = Lex(POLIZ_LABEL, poliz.size());
+        }
+        break_stack[cycle_count-1] = {};
         cycle_count--;
     }
 }
