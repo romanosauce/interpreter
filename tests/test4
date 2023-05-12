@@ -1,17 +1,24 @@
-program {
-    int a = 5;
-    int i, j;
-    boolean flag = true;
-    i = 0;
-    while (i < 10) {
-        if (i == 5) {
-            write(i);
-            break;
-        } else {
-            write(10 - i);
-        }
-        i = i + 1;
+program /* Тест - пример из задания */
+{
+    int a=51,b=6,c;
+    string x="abc",y,z="abcd";
+    c=(a+b)*2;
+    write(c);
+    if(c>=100 or x==z)
+    {
+        read (y);
+        write (y, " ");
+        write (x + y + z, " ", c, " ");
     }
-    gg:
-    write(1);
-}
+    else
+        c = a = 21;
+    
+    while (c > 100)
+    {
+        c = c - 5;
+        write (c, " ");
+        x = x + "step";
+    }
+
+    write (x, "\n");
+} 

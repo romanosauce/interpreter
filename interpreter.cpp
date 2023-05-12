@@ -1224,15 +1224,15 @@ void Executer::execute(vector<Lex> &poliz) {
                 get<int>(args[args.size()-1]) = !get<int>(args[args.size()-1]);
                 break;
             case LEX_AND:
-                res = get<int>(args[args.size()-1]) && 
-                      get<int>(args[args.size()-2]);
+                res = get<int>(args[args.size()-2]) && 
+                      get<int>(args[args.size()-1]);
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
                 break;
             case LEX_OR:
-                res = get<int>(args[args.size()-1]) || 
-                      get<int>(args[args.size()-2]);
+                res = get<int>(args[args.size()-2]) || 
+                      get<int>(args[args.size()-1]);
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
@@ -1246,8 +1246,8 @@ void Executer::execute(vector<Lex> &poliz) {
                     args.pop_back();
                     args.push_back(string_res);
                 } else {
-                    res = get<int>(args[args.size()-1]) + 
-                          get<int>(args[args.size()-2]);
+                    res = get<int>(args[args.size()-2]) + 
+                          get<int>(args[args.size()-1]);
                     args.pop_back();
                     args.pop_back();
                     args.push_back(res);
@@ -1271,8 +1271,8 @@ void Executer::execute(vector<Lex> &poliz) {
                 args.push_back(res);
                 break;
             case LEX_TIMES:
-                res = get<int>(args[args.size()-1]) * 
-                      get<int>(args[args.size()-2]);
+                res = get<int>(args[args.size()-2]) * 
+                      get<int>(args[args.size()-1]);
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
@@ -1289,43 +1289,73 @@ void Executer::execute(vector<Lex> &poliz) {
                 args.push_back(res);
                 break;
             case LEX_EQ:
-                res = get<int>(args[args.size()-2]) ==
-                      get<int>(args[args.size()-1]);
+                if (holds_alternative<string>(args[args.size()-1])) {
+                    res = get<string>(args[args.size()-2]) ==
+                                 get<string>(args[args.size()-1]);
+                } else {
+                    res = get<int>(args[args.size()-2]) == 
+                          get<int>(args[args.size()-1]);
+                }
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
                 break;
             case LEX_LSS:
-                res = get<int>(args[args.size()-2]) <
-                      get<int>(args[args.size()-1]);
+                if (holds_alternative<string>(args[args.size()-1])) {
+                    res = get<string>(args[args.size()-2]) <
+                                 get<string>(args[args.size()-1]);
+                } else {
+                    res = get<int>(args[args.size()-2]) < 
+                          get<int>(args[args.size()-1]);
+                }
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
                 break;
             case LEX_GTR:
-                res = get<int>(args[args.size()-2]) >
-                      get<int>(args[args.size()-1]);
+                if (holds_alternative<string>(args[args.size()-1])) {
+                    res = get<string>(args[args.size()-2]) >
+                                 get<string>(args[args.size()-1]);
+                } else {
+                    res = get<int>(args[args.size()-2]) > 
+                          get<int>(args[args.size()-1]);
+                }
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
                 break;
             case LEX_LEQ:
-                res = get<int>(args[args.size()-2]) <=
-                      get<int>(args[args.size()-1]);
+                if (holds_alternative<string>(args[args.size()-1])) {
+                    res = get<string>(args[args.size()-2]) <=
+                                 get<string>(args[args.size()-1]);
+                } else {
+                    res = get<int>(args[args.size()-2]) <=
+                          get<int>(args[args.size()-1]);
+                }
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
                 break;
             case LEX_GEQ:
-                res = get<int>(args[args.size()-2]) >=
-                      get<int>(args[args.size()-1]);
+                if (holds_alternative<string>(args[args.size()-1])) {
+                    res = get<string>(args[args.size()-2]) >=
+                                 get<string>(args[args.size()-1]);
+                } else {
+                    res = get<int>(args[args.size()-2]) >= 
+                          get<int>(args[args.size()-1]);
+                }
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
                 break;
             case LEX_NEQ:
-                res = get<int>(args[args.size()-2]) !=
-                      get<int>(args[args.size()-1]);
+                if (holds_alternative<string>(args[args.size()-1])) {
+                    res = get<string>(args[args.size()-2]) !=
+                                 get<string>(args[args.size()-1]);
+                } else {
+                    res = get<int>(args[args.size()-2]) != 
+                          get<int>(args[args.size()-1]);
+                }
                 args.pop_back();
                 args.pop_back();
                 args.push_back(res);
