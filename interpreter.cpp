@@ -654,7 +654,8 @@ void Parser::ReadOperators() {
            c_type_ == LEX_TRUE || c_type_ == LEX_FALSE ||
            c_type_ == LEX_STR || c_type_ == LEX_NOT ||
            c_type_ == LEX_MINUS || c_type_ == LEX_PLUS ||
-           c_type_ == LEX_LPAREN) {
+           c_type_ == LEX_LPAREN || c_type_ == LEX_MINUS ||
+           c_type_ == LEX_PLUS) {
         Operator();
     }
 }
@@ -798,7 +799,7 @@ void Parser::ReadFor() {
                 ErrorHandler();
             }
         } else {
-            poliz.push_back(Lex(LEX_TRUE));
+            poliz.push_back(Lex(LEX_TRUE, 1));
         }
         lable_to_jmp_after_sec_exp = poliz.size();
         poliz.push_back(Lex());
@@ -1083,21 +1084,21 @@ void Parser::F() {
         GetNextLex();
     } else if (c_type_ == LEX_NOT) {
         mut_ = false;
-        type_stk_.push(LEX_NOT);
         GetNextLex();
         F();
+        type_stk_.push(LEX_NOT);
         CheckUnary();
     } else if (c_type_ == LEX_MINUS) {
         mut_ = false;
-        type_stk_.push(LEX_MINUS);
         GetNextLex();
         F();
+        type_stk_.push(LEX_MINUS);
         CheckUnary();
     } else if (c_type_ == LEX_PLUS) {
         mut_ = false;
-        type_stk_.push(LEX_PLUS);
         GetNextLex();
         F();
+        type_stk_.push(LEX_PLUS);
         CheckUnary();
     } else if (c_type_ == LEX_LPAREN) {
         mut_ = false;
@@ -1449,18 +1450,6 @@ void Interpretator::Interpretation() {
 }
 
 int main() {
-    Scanner prog("tests/test3");
-    Lex cur_lex = prog.GetLex();
-    while (cur_lex.get_type() != LEX_FIN) {
-        cout << cur_lex;
-        cur_lex = prog.GetLex();
-    }
-    TID.clear();
-    line_count = 0;
-    Parser test_prog("tests/test3");
-    test_prog.StartAnalysis();
-    TID.clear();
-    line_count = 0;
     Interpretator pret("tests/test4");
     pret.Interpretation();
     cout << "end\n";

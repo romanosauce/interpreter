@@ -1,24 +1,23 @@
-program /* Тест - пример из задания */
-{
-    int a=51,b=6,c;
-    string x="abc",y,z="abcd";
-    c=(a+b)*2;
-    write(c);
-    if(c>=100 or x==z)
-    {
-        read (y);
-        write (y, " ");
-        write (x + y + z, " ", c, " ");
+program { /* Проверка на метки */
+    int a = 123, i = 90;
+    if(a == 123) {
+        read(a);
+        goto F;
     }
-    else
-        c = a = 21;
-    
-    while (c > 100)
-    {
-        c = c - 5;
-        write (c, " ");
-        x = x + "step";
-    }
+    else {}
+R:  write("R mark!\n");
+    goto END;
 
-    write (x, "\n");
-} 
+F:  write("F mark!\n");
+    for(;;) {
+        write("yes");
+        i = i + 1;
+        write(i);
+        if(i == 100) {
+            goto M;
+        } else {}
+    }
+M:  write("M mark!\n", "i = ", i, "\n");
+    goto R;
+END:write("END mark!\n");
+}
