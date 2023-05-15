@@ -219,8 +219,12 @@ class Ident {
         void set_value(const variant<int, string> &v) {
             value_ = v;
         }
+        void set_struct_name(const string &struct_name) {
+            struct_name_ = struct_name;
+        }
     private:
         string name_;
+        string struct_name_;
         bool declare_;
         bool assign_;
         TypeOfLex type_;
@@ -586,105 +590,111 @@ void Parser::ReadProgram() {
 }
 
 void Parser::ReadStruct() {
-    if (c_type_ != LEX_STRUCT) {
-    }
-    GetNextLex();
-    if (c_type_ != LEX_IDENT) {
-        err_stk.push_back({WRONG_IDENT_NAME, line_count});
-        ErrorHandler();
-    }
-    TID[c_val_].set_type(LEX_STRUCT);
-    TID[c_val_].set_declare();
-    string name = cur_lex_.get_holder();
-    struct_table[name] = Struct(name);
-    GetNextLex();
-    if (c_type_ != LEX_LCURL_BRACKET) {
-        err_stk.push_back({SYNT_NO_OPCURL_BRAC, line_count});
-        ErrorHandler();
-    }
-    GetNextLex();
-    TypeOfLex decl_type;
-    vector<Ident>::iterator it;
-    while (c_type_ == LEX_INT || c_type_ == LEX_STRING ||
-           c_type_ == LEX_BOOL) {
-        decl_type = c_type_;
-        do {
-            GetNextLex();
-            if (c_type_ != LEX_IDENT) {
-                err_stk.push_back({WRONG_IDENT_NAME, line_count});
-                ErrorHandler();
-            }
-            auto &cur_struct_fields = struct_table[name].fields_;
-            if ((it = find(cur_struct_fields.begin(),
-                           cur_struct_fields.end(), 
-                           cur_lex_.get_holder())) !=
-                      cur_struct_fields.end()) {
-                cur_struct_fields.emplace_back(cur_lex_.get_holder());
-            } else {
-                err_stk.push_back({SEM_PREV_DECL, line_count});
-                ErrorHandler();
-            }
-            auto &id = cur_struct_fields[cur_struct_fields.size()-1];
-            id.set_declare();
-            id.set_type(decl_type);
-            GetNextLex();
-            if (c_type_ == LEX_ASSIGN) {
+    while (c_type_ == LEX_STRUCT) {
+        GetNextLex();
+        if (c_type_ != LEX_IDENT) {
+            err_stk.push_back({WRONG_IDENT_NAME, line_count});
+            ErrorHandler();
+        }
+        TID[c_val_].set_type(LEX_STRUCT);
+        TID[c_val_].set_declare();
+        string name = cur_lex_.get_holder();
+        struct_table[name] = Struct(name);
+        GetNextLex();
+        if (c_type_ != LEX_LCURL_BRACKET) {
+            err_stk.push_back({SYNT_NO_OPCURL_BRAC, line_count});
+            ErrorHandler();
+        }
+        GetNextLex();
+        TypeOfLex decl_type;
+        vector<Ident>::iterator it;
+        while (c_type_ == LEX_INT || c_type_ == LEX_STRING ||
+               c_type_ == LEX_BOOL) {
+            decl_type = c_type_;
+            do {
                 GetNextLex();
-                if (c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
-                    if (decl_type == LEX_INT) {
-                        GetNextLex();
-                        if (c_type_ != LEX_NUM) {
+                if (c_type_ != LEX_IDENT) {
+                    err_stk.push_back({WRONG_IDENT_NAME, line_count});
+                    ErrorHandler();
+                }
+                auto &cur_struct_fields = struct_table[name].fields_;
+                if ((it = find(cur_struct_fields.begin(),
+                               cur_struct_fields.end(), 
+                               cur_lex_.get_holder())) !=
+                          cur_struct_fields.end()) {
+                    cur_struct_fields.emplace_back(cur_lex_.get_holder());
+                } else {
+                    err_stk.push_back({SEM_PREV_DECL, line_count});
+                    ErrorHandler();
+                }
+                auto &id = cur_struct_fields[cur_struct_fields.size()-1];
+                id.set_declare();
+                id.set_type(decl_type);
+                GetNextLex();
+                if (c_type_ == LEX_ASSIGN) {
+                    GetNextLex();
+                    if (c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
+                        if (decl_type == LEX_INT) {
+                            GetNextLex();
+                            if (c_type_ != LEX_NUM) {
+                                err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                                ErrorHandler();
+                            }
+                            id.set_value((c_type_ == LEX_MINUS ? -1 : 1) *
+                                                  cur_lex_.get_value());
+                            id.set_assign();
+                        } else {
                             err_stk.push_back({SEM_WRONG_TYPE, line_count});
                             ErrorHandler();
                         }
-                        id.set_value((c_type_ == LEX_MINUS ? -1 : 1) *
-                                              cur_lex_.get_value());
+                    } else if (c_type_ == LEX_STR) {
+                        if (decl_type == LEX_STRING) {
+                            id.set_value(cur_lex_.get_holder());
+                            id.set_assign();
+                        } else {
+                            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                            ErrorHandler();
+                        }
+                    } else if (c_type_ == LEX_NUM) {
+                        if (decl_type != LEX_INT) {
+                            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                            ErrorHandler();
+                        }
+                        id.set_value(cur_lex_.get_value());
+                        id.set_assign();
+                    } else if (c_type_ == LEX_TRUE || c_type_ == LEX_FALSE) {
+                        id.set_value((c_type_ == LEX_TRUE ? 1 : 0));
                         id.set_assign();
                     } else {
                         err_stk.push_back({SEM_WRONG_TYPE, line_count});
                         ErrorHandler();
                     }
-                } else if (c_type_ == LEX_STR) {
-                    if (decl_type == LEX_STRING) {
-                        id.set_value(cur_lex_.get_holder());
-                        id.set_assign();
-                    } else {
-                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
-                        ErrorHandler();
-                    }
-                } else if (c_type_ == LEX_NUM) {
-                    if (decl_type != LEX_INT) {
-                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
-                        ErrorHandler();
-                    }
-                    id.set_value(cur_lex_.get_value());
-                    id.set_assign();
-                } else if (c_type_ == LEX_TRUE || c_type_ == LEX_FALSE) {
-                    id.set_value((c_type_ == LEX_TRUE ? 1 : 0));
-                    id.set_assign();
-                } else {
-                    err_stk.push_back({SEM_WRONG_TYPE, line_count});
-                    ErrorHandler();
+                    GetNextLex();
                 }
-                GetNextLex();
+            } while (c_type_ == LEX_COMMA);
+            if (c_type_ != LEX_SEMICOLON) {
+                err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+                return;
             }
-        } while (c_type_ == LEX_COMMA);
-        if (c_type_ != LEX_SEMICOLON) {
-            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
-            return;
+            GetNextLex();
+        }
+        if (c_type_ != LEX_RCURL_BRACKET) {
+            err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
+            ErrorHandler();
         }
         GetNextLex();
-    }
-    if (c_type_ != LEX_RCURL_BRACKET) {
-        err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
-        ErrorHandler();
+        if (c_type_ != LEX_SEMICOLON) {
+            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+            ErrorHandler();
+        }
+        GetNextLex();
     }
 }
 
 void Parser::ReadDeclarations() {
     cout << "ReadDecl\n";
     while (c_type_ == LEX_INT || c_type_ == LEX_STRING ||
-           c_type_ == LEX_BOOL) {
+           c_type_ == LEX_BOOL || c_type_ == LEX_STRUCT) {
         Declaration();
         if (c_type_ != LEX_SEMICOLON) {
             err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
@@ -697,12 +707,13 @@ void Parser::ReadDeclarations() {
 void Parser::Declaration() {
     cout << "Decl\n";
     TypeOfLex decl_type = c_type_;
+    string name = cur_lex_.get_holder();
     do {
         GetNextLex();
         if (c_type_ != LEX_IDENT) {
             err_stk.push_back({WRONG_IDENT_NAME, line_count});
             ErrorHandler();
-        } else {
+        } else if (decl_type != LEX_STRUCT) {
             int index = cur_lex_.get_value();
             if (TID[index].get_declare()) {
                 err_stk.push_back({SEM_PREV_DECL, line_count});
@@ -752,6 +763,17 @@ void Parser::Declaration() {
                 }
                 GetNextLex();
             }
+        } else {
+            int index = cur_lex_.get_value();
+            if (TID[index].get_declare()) {
+                err_stk.push_back({SEM_PREV_DECL, line_count});
+                ErrorHandler();
+            } else {
+                TID[index].set_declare();
+                TID[index].set_type(decl_type);
+                TID[index].set_struct_name(name);
+            }
+            GetNextLex();
         }
     } while (c_type_ == LEX_COMMA);
 }
