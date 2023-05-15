@@ -157,7 +157,7 @@ enum TypeOfLex {
     LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_LEQ, LEX_NEQ, LEX_GEQ, LEX_NUM,
     LEX_STR, LEX_PERCENT, LEX_QUOTE, LEX_PERIOD,
 
-    LEX_IDENT,
+    LEX_IDENT, LEX_STRUCT_INSTANCE,
 
     POLIZ_GO, POLIZ_FGO, POLIZ_LABEL, POLIZ_ADDRESS,
     LEX_UN_MINUS, LEX_UN_PLUS
@@ -770,7 +770,7 @@ void Parser::Declaration() {
                 ErrorHandler();
             } else {
                 TID[index].set_declare();
-                TID[index].set_type(decl_type);
+                TID[index].set_type(LEX_STRUCT_INSTANCE);
                 TID[index].set_struct_name(name);
             }
             GetNextLex();
