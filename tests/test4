@@ -1,5 +1,5 @@
 program { /* Проверка на метки */
-    int a = 123, i = 90;
+    int a = 123, i = 0;
     if(a == 123) {
         read(a);
         goto F;
@@ -10,9 +10,7 @@ R:  write("R mark!\n");
 
 F:  write("F mark!\n");
     for(;;) {
-        write("yes");
         i = i + 1;
-        write(i);
         if(i == 100) {
             goto M;
         } else {}

@@ -150,12 +150,12 @@ enum TypeOfLex {
     LEX_AND, LEX_BOOL, LEX_DO, LEX_ELSE, LEX_END, LEX_IF, LEX_FALSE,
     LEX_INT, LEX_NOT, LEX_OR, LEX_PROGRAM, LEX_READ, LEX_THEN, LEX_TRUE,
     LEX_WHILE, LEX_WRITE, LEX_STRING, LEX_FIN, LEX_CONTINUE,
-    LEX_BREAK, LEX_GOTO, LEX_FOR, LEX_LABLE,
+    LEX_BREAK, LEX_GOTO, LEX_FOR, LEX_LABLE, LEX_STRUCT,
 
     LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_ASSIGN, LEX_LPAREN, LEX_RPAREN,
     LEX_LCURL_BRACKET, LEX_RCURL_BRACKET, LEX_EQ, LEX_LSS, LEX_GTR, LEX_PLUS, 
     LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_LEQ, LEX_NEQ, LEX_GEQ, LEX_NUM,
-    LEX_STR, LEX_PERCENT, LEX_QUOTE,
+    LEX_STR, LEX_PERCENT, LEX_QUOTE, LEX_PERIOD,
 
     LEX_IDENT,
 
@@ -227,7 +227,19 @@ class Ident {
         variant<int, string> value_;
 };
 
+class Struct {
+    public:
+        Struct(const string &name) : name_(name) {}
+        void push_field(Ident &field) {
+            fields_.push_back(field);
+        }
+        vector<Ident> fields_;
+    private:
+        string name_;
+};
+
 vector<Ident> TID;
+map<string, Struct> struct_table;
 
 class Scanner {
     public:
@@ -356,7 +368,8 @@ map<string, TypeOfLex> Scanner::reserved_words_ = {
     {"continue", LEX_CONTINUE},
     {"break", LEX_BREAK},
     {"goto", LEX_GOTO},
-    {"for", LEX_FOR}
+    {"for", LEX_FOR},
+    {"struct", LEX_STRUCT}
     //"program", "int", "real", "string", "boolean", "if", "else",
     //"do", "while", "read", "write", "for", "break", "continue", "true",
     //"false", "not", "and", "or", "goto"
@@ -364,7 +377,7 @@ map<string, TypeOfLex> Scanner::reserved_words_ = {
 
 set<char> Scanner::stop_chars_ = {
     ' ', '\n', '\t', '*', '%', '+', '-', '<', '>', '=', '!', ',',
-    ';', ':', '(', ')', '/', '"', '{', '}'
+    ';', ':', '(', ')', '/', '"', '{', '}', '.'
 };
 
 map<string, TypeOfLex> Scanner::delimeters_ = {
@@ -387,7 +400,8 @@ map<string, TypeOfLex> Scanner::delimeters_ = {
     {"!=", LEX_NEQ},
     {">=", LEX_GEQ},
     {"%", LEX_PERCENT},
-    {"\"", LEX_QUOTE}
+    {"\"", LEX_QUOTE},
+    {".", LEX_PERIOD}
 };
 
 Lex Scanner::GetLex() {
@@ -475,6 +489,7 @@ class Parser {
         void CheckUnary();
         void EqBool();
 
+        void ReadStruct();
         void ReadProgram();
         void ReadDeclarations();
         void ReadOperators();
@@ -557,6 +572,7 @@ void Parser::ReadProgram() {
         err_stk.push_back({SYNT_NO_OPCURL_BRAC, line_count});
         ErrorHandler();
     }
+    ReadStruct();
     ReadDeclarations();
     ReadOperators();
     if (c_type_ != LEX_RCURL_BRACKET) {
@@ -566,6 +582,98 @@ void Parser::ReadProgram() {
     cout << "-----------------------------\n";
     for (Lex l : poliz) {
         cout << l;
+    }
+}
+
+void Parser::ReadStruct() {
+    if (c_type_ != LEX_STRUCT) {
+    }
+    GetNextLex();
+    if (c_type_ != LEX_IDENT) {
+        err_stk.push_back({WRONG_IDENT_NAME, line_count});
+        ErrorHandler();
+    }
+    TID[c_val_].set_type(LEX_STRUCT);
+    TID[c_val_].set_declare();
+    string name = cur_lex_.get_holder();
+    struct_table[name] = Struct(name);
+    GetNextLex();
+    if (c_type_ != LEX_LCURL_BRACKET) {
+        err_stk.push_back({SYNT_NO_OPCURL_BRAC, line_count});
+        ErrorHandler();
+    }
+    GetNextLex();
+    TypeOfLex decl_type;
+    vector<Ident>::iterator it;
+    while (c_type_ == LEX_INT || c_type_ == LEX_STRING ||
+           c_type_ == LEX_BOOL) {
+        decl_type = c_type_;
+        do {
+            GetNextLex();
+            if (c_type_ != LEX_IDENT) {
+                err_stk.push_back({WRONG_IDENT_NAME, line_count});
+                ErrorHandler();
+            }
+            auto &cur_struct_fields = struct_table[name].fields_;
+            if ((it = find(cur_struct_fields.begin(),
+                           cur_struct_fields.end(), 
+                           cur_lex_.get_holder())) !=
+                      cur_struct_fields.end()) {
+                cur_struct_fields.emplace_back(cur_lex_.get_holder());
+            } else {
+                err_stk.push_back({SEM_PREV_DECL, line_count});
+                ErrorHandler();
+            }
+            auto &id = cur_struct_fields[cur_struct_fields.size()-1];
+            id.set_declare();
+            id.set_type(decl_type);
+            GetNextLex();
+            if (c_type_ == LEX_ASSIGN) {
+                GetNextLex();
+                if (c_type_ == LEX_MINUS || c_type_ == LEX_PLUS) {
+                    if (decl_type == LEX_INT) {
+                        GetNextLex();
+                        if (c_type_ != LEX_NUM) {
+                            err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                            ErrorHandler();
+                        }
+                        id.set_value((c_type_ == LEX_MINUS ? -1 : 1) *
+                                              cur_lex_.get_value());
+                        id.set_assign();
+                    } else {
+                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                        ErrorHandler();
+                    }
+                } else if (c_type_ == LEX_STR) {
+                    if (decl_type == LEX_STRING) {
+                        id.set_value(cur_lex_.get_holder());
+                        id.set_assign();
+                    } else {
+                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                        ErrorHandler();
+                    }
+                } else if (c_type_ == LEX_NUM) {
+                    if (decl_type != LEX_INT) {
+                        err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                        ErrorHandler();
+                    }
+                    id.set_value(cur_lex_.get_value());
+                    id.set_assign();
+                } else if (c_type_ == LEX_TRUE || c_type_ == LEX_FALSE) {
+                    id.set_value((c_type_ == LEX_TRUE ? 1 : 0));
+                    id.set_assign();
+                } else {
+                    err_stk.push_back({SEM_WRONG_TYPE, line_count});
+                    ErrorHandler();
+                }
+                GetNextLex();
+            }
+        } while (c_type_ == LEX_COMMA);
+        if (c_type_ != LEX_SEMICOLON) {
+            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+            return;
+        }
+        GetNextLex();
     }
 }
 
