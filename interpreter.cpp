@@ -675,6 +675,10 @@ void Parser::ReadStruct() {
         }
         GetNextLex();
     }
+    if (c_type_ != LEX_RCURL_BRACKET) {
+        err_stk.push_back({SYNT_NO_CLCURL_BRAC, line_count});
+        ErrorHandler();
+    }
 }
 
 void Parser::ReadDeclarations() {
