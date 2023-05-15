@@ -184,6 +184,28 @@ class Lex {
         string holder_;
 };
 
+class Ident;
+
+class Struct {
+    public:
+        Struct() {}
+        Struct(const string &name) : name_(name) {}
+        string get_name() {
+            return name_;
+        }
+        void push_field(Ident &field) {
+            fields_.push_back(field);
+        }
+        vector<Ident> fields_;
+        Struct operator=(Struct &other) {
+            name_ = other.name_;
+            fields_ = other.fields_;
+            return *this;
+        }
+    private:
+        string name_;
+};
+
 class Ident {
     public:
         Ident() : declare_(false), assign_(false) {}
@@ -219,27 +241,16 @@ class Ident {
         void set_value(const variant<int, string> &v) {
             value_ = v;
         }
-        void set_struct_name(const string &struct_name) {
-            struct_name_ = struct_name;
+        void set_struct_value(Struct &struct_value) {
+            struct_value_ = struct_value;
         }
     private:
         string name_;
-        string struct_name_;
         bool declare_;
         bool assign_;
         TypeOfLex type_;
         variant<int, string> value_;
-};
-
-class Struct {
-    public:
-        Struct(const string &name) : name_(name) {}
-        void push_field(Ident &field) {
-            fields_.push_back(field);
-        }
-        vector<Ident> fields_;
-    private:
-        string name_;
+        Struct struct_value_;
 };
 
 vector<Ident> TID;
@@ -771,7 +782,7 @@ void Parser::Declaration() {
             } else {
                 TID[index].set_declare();
                 TID[index].set_type(LEX_STRUCT_INSTANCE);
-                TID[index].set_struct_name(name);
+                TID[index].set_struct_value(struct_table[name]);
             }
             GetNextLex();
         }
