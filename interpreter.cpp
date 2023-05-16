@@ -1098,30 +1098,56 @@ void Parser::Read() {
     if (c_type_ != LEX_LPAREN) {
         err_stk.push_back({SYNT_NO_OPPAREN, line_count});
         ErrorHandler();
-    } else {
+    }
+    GetNextLex();
+    cout << "LLL\n";
+    if (c_type_ == LEX_STRUCT_INSTANCE) {
+        cout << "JJJJ\n";
+        Lex struct_inst = cur_lex_;
+        GetNextLex();
+        if (c_type_ != LEX_PERIOD) {
+            err_stk.push_back({WRONG_IDENT_NAME, line_count});
+            ErrorHandler();
+        }
         GetNextLex();
         if (c_type_ != LEX_IDENT) {
             err_stk.push_back({WRONG_IDENT_NAME, line_count});
             ErrorHandler();
         }
+        Lex res = Lex(POLIZ_STRUCT_ADDRESS, struct_inst.get_value());
+        auto &fields = TID[struct_inst.get_value()].struct_value_.fields_;
+        size_t val = find(fields.begin(), fields.end(), cur_lex_.get_holder()) 
+            - fields.begin();
+        if (val == fields.size()) {
+            err_stk.push_back({STRUCT_UNKNW_FIELD, line_count});
+            ErrorHandler();
+        }
+        res.set_sec_v_lex(val);
+        poliz.push_back(res);
+    } else {
+        if (c_type_ != LEX_IDENT) {
+            err_stk.push_back({WRONG_IDENT_NAME, line_count});
+            ErrorHandler();
+        }
+        cout << "DDDD\n";
         if (!TID[c_val_].get_declare()) {
             err_stk.push_back({SEM_NOT_DECLARE, line_count});
             ErrorHandler();
         }
         poliz.push_back(Lex(POLIZ_ADDRESS, c_val_));
-        GetNextLex();
-        if (c_type_ != LEX_RPAREN) {
-            err_stk.push_back({SYNT_NO_CLPAREN, line_count});
-            ErrorHandler();
-        }
-        poliz.push_back(Lex(LEX_READ));
-        GetNextLex();
-        if (c_type_ != LEX_SEMICOLON) {
-            err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
-            ErrorHandler();
-        }
-        GetNextLex();
     }
+    GetNextLex();
+    if (c_type_ != LEX_RPAREN) {
+        err_stk.push_back({SYNT_NO_CLPAREN, line_count});
+        ErrorHandler();
+    }
+    poliz.push_back(Lex(LEX_READ));
+    GetNextLex();
+    if (c_type_ != LEX_SEMICOLON) {
+        err_stk.push_back({SYNT_NO_SEMICOLON, line_count});
+        ErrorHandler();
+    }
+    GetNextLex();
 }
 
 void Parser::Write() {
@@ -1610,16 +1636,21 @@ void Executer::execute(vector<Lex> &poliz) {
                 break;
             case LEX_ASSIGN:
                 if (holds_alternative<pair<int, int>>(args[args.size()-2])) {
-                    int first = get<pair<int, int>>(args[args.size()-2]).first;
-                    int second = get<pair<int, int>>(args[args.size()-2]).second;
-                    if (TID[first].struct_value_.fields_[second].get_type() == LEX_STRING) {
+                    int first = get<pair<int, int>>(
+                            args[args.size()-2]).first;
+                    int second = get<pair<int, int>>(
+                            args[args.size()-2]).second;
+                    if (TID[first].struct_value_.fields_[second].get_type() == 
+                            LEX_STRING) {
                         string v;
-                        TID[first].struct_value_.fields_[second].set_value(v = get<string>(args[args.size()-1]));
+                        TID[first].struct_value_.fields_[second].set_value(
+                                v = get<string>(args[args.size()-1]));
                         args.pop_back();
                         args.pop_back();
                         args.push_back(v);
                     } else {
-                        TID[first].struct_value_.fields_[second].set_value(res = get<int>(args[args.size()-1]));
+                        TID[first].struct_value_.fields_[second].set_value(
+                                res = get<int>(args[args.size()-1]));
                         args.pop_back();
                         args.pop_back();
                         args.push_back(res);
@@ -1633,7 +1664,8 @@ void Executer::execute(vector<Lex> &poliz) {
                         args.pop_back();
                         args.push_back(v);
                     } else if (TID[i].get_type() == LEX_STRUCT_INSTANCE) {
-                        TID[i].struct_value_ = TID[get<int>(args[args.size()-1])].struct_value_;
+                        TID[i].struct_value_ = TID[
+                                get<int>(args[args.size()-1])].struct_value_;
                         args.pop_back();
                         args.pop_back();
                         args.push_back(int(i));
@@ -1684,35 +1716,74 @@ void Executer::execute(vector<Lex> &poliz) {
                 }
                 break;
             case LEX_READ:
-                i = get<int>(args[args.size()-1]);
-                args.pop_back();
-                if (TID[i].get_type() == LEX_INT) {
-                    int k;
-                    cout << "Input int value for " << TID[i].get_name() << endl;
-                    cin >> k;
-                    TID[i].set_value(k);
-                    args.push_back(k);
-                } else if (TID[i].get_type() == LEX_BOOL) {
-                    string j;
-                    while (1) {
-                        cout << "Input boolean value (true of false) for " <<
-                        TID[i].get_name() << endl;
-                        cin >> j;
-                        if (j != "true" && j != "false") {
-                            cout << "Try again\n";
-                            continue;
+                if (holds_alternative<pair<int, int>>(args[args.size()-1])) {
+                    int first = get<pair<int, int>>(
+                            args[args.size()-1]).first;
+                    int second = get<pair<int, int>>(
+                            args[args.size()-1]).second;
+                    args.pop_back();
+                    auto &param = TID[first].struct_value_.fields_[second];
+                    if (param.get_type() == LEX_INT) {
+                        int k;
+                        cout << "Input int value for " << param.get_name() << 
+                            endl;
+                        cin >> k;
+                        param.set_value(k);
+                        args.push_back(k);
+                    } else if (param.get_type() == LEX_BOOL) {
+                        string j;
+                        while (1) {
+                            cout << "Input boolean value (true of false) for " 
+                                << param.get_name() << endl;
+                            cin >> j;
+                            if (j != "true" && j != "false") {
+                                cout << "Try again\n";
+                                continue;
+                            }
+                            args.push_back(j == "true" ? 1 : 0);
+                            break;
                         }
-                        args.push_back(j == "true" ? 1 : 0);
-                        break;
+                    } else {
+                        string j;
+                        cout << "Input string for " << param.get_name() << endl;
+                        cin >> j;
+                        param.set_value(j);
+                        args.push_back(j);
                     }
+                    break;
                 } else {
-                    string j;
-                    cout << "Input string for " << TID[i].get_name() << endl;
-                    cin >> j;
-                    TID[i].set_value(j);
-                    args.push_back(j);
+                    i = get<int>(args[args.size()-1]);
+                    args.pop_back();
+                    if (TID[i].get_type() == LEX_INT) {
+                        int k;
+                        cout << "Input int value for " << TID[i].get_name() 
+                            << endl;
+                        cin >> k;
+                        TID[i].set_value(k);
+                        args.push_back(k);
+                    } else if (TID[i].get_type() == LEX_BOOL) {
+                        string j;
+                        while (1) {
+                            cout << "Input boolean value (true of false) for " 
+                                << TID[i].get_name() << endl;
+                            cin >> j;
+                            if (j != "true" && j != "false") {
+                                cout << "Try again\n";
+                                continue;
+                            }
+                            args.push_back(j == "true" ? 1 : 0);
+                            break;
+                        }
+                    } else {
+                        string j;
+                        cout << "Input string for " << TID[i].get_name() 
+                            << endl;
+                        cin >> j;
+                        TID[i].set_value(j);
+                        args.push_back(j);
+                    }
+                    break;
                 }
-                break;
             default:
                 break;
         }
