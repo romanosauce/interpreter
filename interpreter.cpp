@@ -1740,6 +1740,7 @@ void Executer::execute(vector<Lex> &poliz) {
                                 cout << "Try again\n";
                                 continue;
                             }
+                            param.set_value(j == "true" ? 1 : 0);
                             args.push_back(j == "true" ? 1 : 0);
                             break;
                         }
@@ -1771,6 +1772,7 @@ void Executer::execute(vector<Lex> &poliz) {
                                 cout << "Try again\n";
                                 continue;
                             }
+                            TID[i].set_value(j == "true" ? 1 : 0);
                             args.push_back(j == "true" ? 1 : 0);
                             break;
                         }
