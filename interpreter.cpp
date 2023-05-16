@@ -2,6 +2,7 @@
 #include <sstream>
 #include <iostream>
 #include <stack>
+#include <utility>
 #include <vector>
 #include <map>
 #include <set>
@@ -35,7 +36,8 @@ enum ErrorType {
     SEM_ASSIGN_TO_UNMUT,
     SEM_WRONG_LABLE,
     SEM_UNKNW_LABLE,
-    RUNTIME_ZERO_DIV
+    RUNTIME_ZERO_DIV,
+    STRUCT_UNKNW_FIELD
 };
 
 vector<pair<ErrorType, size_t>> err_stk;
@@ -137,6 +139,9 @@ int ErrorHandler() {
             case RUNTIME_ZERO_DIV:
                 cout << "Runtime error: zero division\n";
                 break;
+            case STRUCT_UNKNW_FIELD:
+                cout << "Can't find struct field on line " << it.second << '\n';
+                break;
             default:
                 break;
         }
@@ -150,16 +155,16 @@ enum TypeOfLex {
     LEX_AND, LEX_BOOL, LEX_DO, LEX_ELSE, LEX_END, LEX_IF, LEX_FALSE,
     LEX_INT, LEX_NOT, LEX_OR, LEX_PROGRAM, LEX_READ, LEX_THEN, LEX_TRUE,
     LEX_WHILE, LEX_WRITE, LEX_STRING, LEX_FIN, LEX_CONTINUE,
-    LEX_BREAK, LEX_GOTO, LEX_FOR, LEX_LABLE, LEX_STRUCT,
+    LEX_BREAK, LEX_GOTO, LEX_FOR, LEX_LABLE, LEX_STRUCT, LEX_STRUCT_WORD,
 
     LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_ASSIGN, LEX_LPAREN, LEX_RPAREN,
     LEX_LCURL_BRACKET, LEX_RCURL_BRACKET, LEX_EQ, LEX_LSS, LEX_GTR, LEX_PLUS, 
     LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_LEQ, LEX_NEQ, LEX_GEQ, LEX_NUM,
     LEX_STR, LEX_PERCENT, LEX_QUOTE, LEX_PERIOD,
 
-    LEX_IDENT, LEX_STRUCT_INSTANCE,
+    LEX_IDENT, LEX_STRUCT_INSTANCE, LEX_FIELD,
 
-    POLIZ_GO, POLIZ_FGO, POLIZ_LABEL, POLIZ_ADDRESS,
+    POLIZ_GO, POLIZ_FGO, POLIZ_LABEL, POLIZ_ADDRESS, POLIZ_STRUCT_ADDRESS,
     LEX_UN_MINUS, LEX_UN_PLUS
 };
 
@@ -174,6 +179,12 @@ class Lex {
         int get_value() const {
             return v_lex_;
         }
+        void set_sec_v_lex(int v) {
+            sec_v_lex_ = v;
+        }
+        int get_sec_value() {
+            return sec_v_lex_;
+        }
         string get_holder() const {
             return holder_;
         }
@@ -181,6 +192,7 @@ class Lex {
     private:
         TypeOfLex t_lex_;
         int v_lex_;
+        int sec_v_lex_;
         string holder_;
 };
 
@@ -197,7 +209,7 @@ class Struct {
             fields_.push_back(field);
         }
         vector<Ident> fields_;
-        Struct operator=(Struct &other) {
+        Struct operator=(const Struct &other) {
             name_ = other.name_;
             fields_ = other.fields_;
             return *this;
@@ -244,13 +256,16 @@ class Ident {
         void set_struct_value(Struct &struct_value) {
             struct_value_ = struct_value;
         }
+        string get_struct_name() {
+            return struct_value_.get_name();
+        }
+        Struct struct_value_;
     private:
         string name_;
         bool declare_;
         bool assign_;
         TypeOfLex type_;
         variant<int, string> value_;
-        Struct struct_value_;
 };
 
 vector<Ident> TID;
@@ -384,7 +399,7 @@ map<string, TypeOfLex> Scanner::reserved_words_ = {
     {"break", LEX_BREAK},
     {"goto", LEX_GOTO},
     {"for", LEX_FOR},
-    {"struct", LEX_STRUCT}
+    {"struct", LEX_STRUCT_WORD}
     //"program", "int", "real", "string", "boolean", "if", "else",
     //"do", "while", "read", "write", "for", "break", "continue", "true",
     //"false", "not", "and", "or", "goto"
@@ -435,7 +450,13 @@ Lex Scanner::GetLex() {
         } else {
             vector<Ident>::iterator it;
             if ((it = find(TID.begin(), TID.end(), buf)) != TID.end()) {
-                return Lex(LEX_IDENT, it - TID.begin(), buf);
+                if (it->get_type() == LEX_STRUCT_INSTANCE) {
+                    return Lex(LEX_STRUCT_INSTANCE, it - TID.begin(), buf);
+                } else if (it->get_type() == LEX_STRUCT) {
+                    return Lex(LEX_STRUCT, it - TID.begin(), buf);
+                } else {
+                    return Lex(LEX_IDENT, it - TID.begin(), buf);
+                }
             } else {
                 TID.emplace_back(Ident(buf));
                 return Lex(LEX_IDENT, TID.size() - 1, buf);
@@ -483,6 +504,17 @@ void GetFromSt(T &st, T_EL &i) {
 
 map<int, vector<int>> unknw_lables;
 
+class TypeStkElem {
+    public:
+        TypeStkElem() {}
+        TypeStkElem(TypeOfLex t, const string &n = "") : t_(t), name_(n) {}
+        TypeOfLex t_;
+        string name_;
+        operator TypeOfLex() {
+            return t_;
+        }
+};
+
 class Parser {
     public:
         vector<Lex> poliz;
@@ -497,12 +529,13 @@ class Parser {
         TypeOfLex c_type_;
         int c_val_;
         Scanner scan_;
-        stack<TypeOfLex> type_stk_;
+        stack<TypeStkElem> type_stk_;
         int cycle_count;
         void CheckIdent();
         void CheckOp();
         void CheckUnary();
         void EqBool();
+        void CheckPeriod();
 
         void ReadStruct();
         void ReadProgram();
@@ -601,13 +634,16 @@ void Parser::ReadProgram() {
 }
 
 void Parser::ReadStruct() {
-    while (c_type_ == LEX_STRUCT) {
+    while (c_type_ == LEX_STRUCT_WORD) {
+        cout << "ReadStruct\n";
         GetNextLex();
         if (c_type_ != LEX_IDENT) {
             err_stk.push_back({WRONG_IDENT_NAME, line_count});
             ErrorHandler();
         }
         TID[c_val_].set_type(LEX_STRUCT);
+        cout << cur_lex_.get_holder() << " AAAA\n";
+        cout << cur_lex_.get_type() << '\n';
         TID[c_val_].set_declare();
         string name = cur_lex_.get_holder();
         struct_table[name] = Struct(name);
@@ -631,7 +667,7 @@ void Parser::ReadStruct() {
                 auto &cur_struct_fields = struct_table[name].fields_;
                 if ((it = find(cur_struct_fields.begin(),
                                cur_struct_fields.end(), 
-                               cur_lex_.get_holder())) !=
+                               cur_lex_.get_holder())) ==
                           cur_struct_fields.end()) {
                     cur_struct_fields.emplace_back(cur_lex_.get_holder());
                 } else {
@@ -704,6 +740,8 @@ void Parser::ReadStruct() {
 
 void Parser::ReadDeclarations() {
     cout << "ReadDecl\n";
+    cout << cur_lex_.get_holder() << " AAAA\n";
+    cout << cur_lex_.get_type() << '\n';
     while (c_type_ == LEX_INT || c_type_ == LEX_STRING ||
            c_type_ == LEX_BOOL || c_type_ == LEX_STRUCT) {
         Declaration();
@@ -800,12 +838,13 @@ void Parser::ReadOperators() {
            c_type_ == LEX_STR || c_type_ == LEX_NOT ||
            c_type_ == LEX_MINUS || c_type_ == LEX_PLUS ||
            c_type_ == LEX_LPAREN || c_type_ == LEX_MINUS ||
-           c_type_ == LEX_PLUS) {
+           c_type_ == LEX_PLUS || c_type_ == LEX_STRUCT_INSTANCE) {
         Operator();
     }
 }
 
 void Parser::Operator() {
+    cout << "Operator\n";
     if (c_type_ == LEX_IF) {
         GetNextLex();
         ReadIf();
@@ -829,7 +868,7 @@ void Parser::Operator() {
     } else if (c_type_ == LEX_GOTO) {
         GetNextLex();
         Goto();
-    } else if (c_type_ == LEX_IDENT) {
+    } else if (c_type_ == LEX_IDENT || c_type_ == LEX_STRUCT_INSTANCE) {
         Lex lex_copy = cur_lex_;
         GetNextLex();
         if (c_type_ == LEX_COLON) {
@@ -1096,6 +1135,7 @@ void Parser::Write() {
             GetNextLex();
             Expression();
         } while (c_type_ == LEX_COMMA);
+        cout << "AAAA\n";
         if (c_type_ != LEX_RPAREN) {
             err_stk.push_back({SYNT_NO_CLPAREN, line_count});
             ErrorHandler();
@@ -1128,8 +1168,22 @@ void Parser::Expression() {
             ErrorHandler();
         }
         Lex ident_lex = poliz.back();
-        poliz.pop_back();                                                       //used to remove LEX_IDENT from poliz stack and replace it with address
-        poliz.push_back(Lex(POLIZ_ADDRESS, ident_lex.get_value()));
+        if (ident_lex.get_type() == LEX_IDENT) {
+            poliz.pop_back();                                                       //used to remove LEX_IDENT from poliz stack and replace it with address
+            poliz.push_back(Lex(POLIZ_ADDRESS, ident_lex.get_value()));
+        } else if (ident_lex.get_type() == LEX_PERIOD) {
+            poliz.pop_back();
+            Lex field = poliz.back();
+            poliz.pop_back();
+            Lex struct_inst = poliz.back();
+            poliz.pop_back();
+            Lex res = Lex(POLIZ_STRUCT_ADDRESS, struct_inst.get_value());
+            auto &fields = TID[struct_inst.get_value()].struct_value_.fields_;
+            int val = find(fields.begin(), fields.end(), field.get_holder()) 
+                - fields.begin();
+            res.set_sec_v_lex(val);
+            poliz.push_back(res);
+        }
         type_stk_.push(c_type_);
         mut_ = false;
         GetNextLex();
@@ -1212,9 +1266,24 @@ void Parser::F() {
         GetNextLex();
     } else if (c_type_ == LEX_IDENT) {
         CheckIdent();
-        mut_ = true;
+        if (TID[c_val_].get_type() == LEX_STRUCT_INSTANCE) {
+            cout << "BBB\n";
+            CheckIdent();
+            poliz.push_back(cur_lex_);
+            mut_ = true;
+            CheckPeriod(); 
+        } else {
+            cout << "CCC\n";
+            mut_ = true;
+            poliz.push_back(cur_lex_);
+            GetNextLex();
+        }
+    } else if (c_type_ == LEX_STRUCT_INSTANCE) {
+        cout << "BBB\n";
+        CheckIdent();
         poliz.push_back(cur_lex_);
-        GetNextLex();
+        mut_ = true;
+        CheckPeriod(); 
     } else if (c_type_ == LEX_NUM) {
         type_stk_.push(LEX_INT);
         poliz.push_back(cur_lex_);
@@ -1261,15 +1330,37 @@ void Parser::F() {
 
 void Parser::CheckIdent() {
     if (TID[c_val_].get_declare()) {
-        type_stk_.push(TID[c_val_].get_type());
+        type_stk_.push({TID[c_val_].get_type(), TID[c_val_].get_struct_name()});
     } else {
         err_stk.push_back({SEM_NOT_DECLARE, line_count});
         ErrorHandler();
     }
 }
 
+void Parser::CheckPeriod() {
+    GetNextLex();
+    if (c_type_ == LEX_PERIOD) {
+        TypeStkElem op1;
+        GetNextLex();
+        Lex res = Lex(LEX_FIELD, 0, cur_lex_.get_holder());
+        poliz.push_back(res);
+        GetFromSt(type_stk_, op1);
+        auto &fields = struct_table[op1.name_].fields_;
+        vector<Ident>::iterator it;
+        if ((it = find(fields.begin(), fields.end(), cur_lex_.get_holder())) !=
+            fields.end()) {
+            type_stk_.push(it->get_type());
+        } else {
+            err_stk.push_back({STRUCT_UNKNW_FIELD, line_count});
+            ErrorHandler();
+        }
+        poliz.push_back(Lex(LEX_PERIOD));
+        GetNextLex();
+    }
+}
+
 void Parser::CheckOp() {
-    TypeOfLex t1, t2, op;
+    TypeStkElem t1, t2, op;
     GetFromSt(type_stk_, t2);
     GetFromSt(type_stk_, op);
     GetFromSt(type_stk_, t1);
@@ -1297,7 +1388,7 @@ void Parser::CheckOp() {
             err_stk.push_back({SEM_WRONG_TYPE, line_count});
         }
     } else if (op == LEX_ASSIGN) {
-        if (t1 == t2) {
+        if (t1 == t2 && t1.name_ == t2.name_) {
             type_stk_.push(t1);
         } else {
             err_stk.push_back({SEM_WRONG_TYPE, line_count});
@@ -1341,7 +1432,7 @@ class Executer {
 
 void Executer::execute(vector<Lex> &poliz) {
     Lex cur_lex;
-    vector<variant<int, string>> args;
+    vector<variant<int, string, pair<int, int>>> args;
     size_t i, size = poliz.size();
     size_t cur_i = 0;
     int res;
@@ -1365,6 +1456,17 @@ void Executer::execute(vector<Lex> &poliz) {
                 } else {
                     args.push_back(get<int>(TID[i].get_value()));
                 }
+                break;
+            case LEX_FIELD:
+                args.push_back(cur_lex.get_holder());
+                break;
+            case LEX_STRUCT_INSTANCE:
+                i = cur_lex.get_value();
+                args.push_back(int (i));
+                break;
+            case POLIZ_STRUCT_ADDRESS:
+                args.push_back(make_pair(cur_lex.get_value(),
+                               cur_lex.get_sec_value()));
                 break;
             case LEX_NOT:
                 get<int>(args[args.size()-1]) = !get<int>(args[args.size()-1]);
@@ -1507,20 +1609,51 @@ void Executer::execute(vector<Lex> &poliz) {
                 args.push_back(res);
                 break;
             case LEX_ASSIGN:
-                i = get<int>(args[args.size()-2]);
-                if (TID[i].get_type() == LEX_STRING) {
-                    string v;
-                    TID[i].set_value(v = get<string>(args[args.size()-1]));
-                    args.pop_back();
-                    args.pop_back();
-                    args.push_back(v);
+                if (holds_alternative<pair<int, int>>(args[args.size()-2])) {
+                    int first = get<pair<int, int>>(args[args.size()-2]).first;
+                    int second = get<pair<int, int>>(args[args.size()-2]).second;
+                    if (TID[first].struct_value_.fields_[second].get_type() == LEX_STRING) {
+                        string v;
+                        TID[first].struct_value_.fields_[second].set_value(v = get<string>(args[args.size()-1]));
+                        args.pop_back();
+                        args.pop_back();
+                        args.push_back(v);
+                    } else {
+                        TID[first].struct_value_.fields_[second].set_value(res = get<int>(args[args.size()-1]));
+                        args.pop_back();
+                        args.pop_back();
+                        args.push_back(res);
+                    }
                 } else {
-                    TID[i].set_value(res = get<int>(args[args.size()-1]));
-                    args.pop_back();
-                    args.pop_back();
-                    args.push_back(res);
+                    i = get<int>(args[args.size()-2]);
+                    if (TID[i].get_type() == LEX_STRING) {
+                        string v;
+                        TID[i].set_value(v = get<string>(args[args.size()-1]));
+                        args.pop_back();
+                        args.pop_back();
+                        args.push_back(v);
+                    } else if (TID[i].get_type() == LEX_STRUCT_INSTANCE) {
+                        TID[i].struct_value_ = TID[get<int>(args[args.size()-1])].struct_value_;
+                        args.pop_back();
+                        args.pop_back();
+                        args.push_back(int(i));
+                    }
                 }
                 break;
+            case LEX_PERIOD: {
+                string op1 = get<string>(args[args.size()-1]);
+                int i = get<int>(args[args.size()-2]);
+                args.pop_back();
+                args.pop_back();
+                auto &fields = TID[i].struct_value_.fields_;
+                auto it = find(fields.begin(), fields.end(), op1);
+                if (it->get_type() == LEX_STRING) {
+                    args.push_back(get<string>(it->get_value()));
+                } else {
+                    args.push_back(get<int>(it->get_value()));
+                }
+                break;
+            }
             case POLIZ_GO:
                 cur_i = get<int>(args[args.size()-1]) - 1;
                 args.pop_back();
@@ -1534,8 +1667,11 @@ void Executer::execute(vector<Lex> &poliz) {
                 break;
             case LEX_WRITE:
                 for (int j = cur_lex.get_value(); j > 0; --j) {
-                    visit([](auto&& arg){ std::cout << arg; }, 
-                             args[args.size()-j]);
+                    if (holds_alternative<int>(args[args.size()-j])) {
+                        cout << get<int>(args[args.size()-j]);
+                    } else {
+                        cout << get<string>(args[args.size()-j]);
+                    }
                 }
                 cout << '\n';
                 for (int j = 0; j < cur_lex.get_value(); ++j) {
@@ -1595,7 +1731,7 @@ void Interpretator::Interpretation() {
 }
 
 int main() {
-    Interpretator pret("tests/test4");
+    Interpretator pret("tests/test5");
     pret.Interpretation();
     cout << "end\n";
 }

@@ -1,0 +1,10 @@
+program {
+    struct abc {
+        int a = 6, g = 100;
+        string c = "aaa";
+    };
+    abc a;
+    a.a = a.g;
+    string c = "test";
+    write(a.c + c, a.a + 11);
+}
