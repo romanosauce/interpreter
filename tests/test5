@@ -4,7 +4,6 @@ program {
         string c = "aaa";
     };
     abc a;
-    a.a = a.g;
+    int i = 0;
     string c = "test";
-    write(a.c + c, a.a + 11);
 }

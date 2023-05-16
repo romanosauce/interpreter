@@ -1637,6 +1637,11 @@ void Executer::execute(vector<Lex> &poliz) {
                         args.pop_back();
                         args.pop_back();
                         args.push_back(int(i));
+                    } else {
+                        TID[i].set_value(res = get<int>(args[args.size()-1]));
+                        args.pop_back();
+                        args.pop_back();
+                        args.push_back(res);
                     }
                 }
                 break;
