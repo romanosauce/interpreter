@@ -1,21 +1,41 @@
 program {
-    struct test2 {
-        string str = "eee";
-        int ii = 3;
-        int i = 2;
-        boolean flag = true;
+    struct abc {
+        int a = 5;
+        string str = "ttt";
+        boolean flag;
+        int b;
     };
+
     struct test {
-        string str = "abcd";
-        int i = 2;
-        boolean flag = false;
+        int a = 10;
+        string sss = "eee";
+        boolean flag = true;
+        int b = 32;
+        string aa;
     };
-    test t1, t2;
-    test2 t3;
-    boolean flag;
-    read(flag);
-    write(flag);
-    read(t2.flag);
-    write(t2.flag);
-    write(t2.str);
+
+    abc t1;
+    test t2;
+    string str;
+    int i;
+    string b = "";
+
+    t1 = t2;
+
+    write(t1.a + (t2.a * 3) - t2.b, t1.str + t2.sss);
+    if (t2.flag == false) {
+        write("IT IS FALSE");
+    } else {}
+
+    str = t2.sss + t1.str + "constant";
+    write(str);
+    for (t2.a = 0; t2.flag == true; t2.a = t2.a + 1) {
+        if (t2.a == 20) {
+            break;
+        } else {
+            b = b + "t";
+            write(b);
+        }
+    }
+
 }

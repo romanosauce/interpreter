@@ -1414,10 +1414,12 @@ void Parser::CheckOp() {
             err_stk.push_back({SEM_WRONG_TYPE, line_count});
         }
     } else if (op == LEX_ASSIGN) {
+        cout << "WERAER " << t1.name_ << ' ' << t2.name_ << '\n';
         if (t1 == t2 && t1.name_ == t2.name_) {
             type_stk_.push(t1);
         } else {
             err_stk.push_back({SEM_WRONG_TYPE, line_count});
+            ErrorHandler();
         }
     }
     poliz.push_back(Lex(op));
